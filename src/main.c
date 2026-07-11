@@ -14,6 +14,7 @@
 #include "math2d.h"
 #include "file_read.h"
 #include "shader.h"
+#include "texture.h"
 
 // 窗口尺寸变化时的回调
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -258,10 +259,10 @@ void lum_text_destroy_renderer(lum_Text_renderer* tr) {
 }
 
 int main() {
-  const char *vertexShaderSource = lum_file_read("C:/C Projects/Luminous/src/shaders/vertex.shader");
-  const char *fragmentShaderSource = lum_file_read("C:/C Projects/Luminous/src/shaders/fragment.shader");
-  const char *text_vertex_source = lum_file_read("C:/C Projects/Luminous/src/shaders/text_renderer_vertex.shader");
-  const char *text_fragment_source = lum_file_read("C:/C Projects/Luminous/src/shaders/text_renderer_fragment.shader");
+  const char *vertexShaderSource = lum_file_read("shaders/vertex.shader");
+  const char *fragmentShaderSource = lum_file_read("shaders/fragment.shader");
+  const char *text_vertex_source = lum_file_read("shaders/text_renderer_vertex.shader");
+  const char *text_fragment_source = lum_file_read("shaders/text_renderer_fragment.shader");
 
   // 1. 初始化 GLFW
     if (!glfwInit()) {
@@ -330,14 +331,15 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    GLuint texture = lum_texture_create_2D_from_dir("texture.jpg", true);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    lum_Texture2d texture;
+    lum_texture2d_load_from_file(&texture, "resources/texture.jpg", 0);
+    lum_texture2d_bind(&texture, 0);
 
     shader.initialized = true;
     lum_shader_uniform_set1i(&shader, "texture1", 0);
 
     lum_Text_renderer tr;
-    if (!lum_text_initialize_renderer(&tr, "FiraCode-Regular.ttf", 48.0f)) {
+    if (!lum_text_initialize_renderer(&tr, "resources/FiraCode-Regular.ttf", 48.0f)) {
       fprintf(stderr, "Failed to initialize text renderer.");
     }
 
@@ -370,7 +372,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
 
        	glBindVertexArray(0);
-	glBindTexture(GL_TEXTURE_2D, texture);
+	lum_texture2d_bind(&texture, 0);
 	
         // 使用着色器程序并绘制三角形
 	lum_shader_use(&shader);
@@ -388,7 +390,7 @@ int main() {
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     lum_shader_destroy(&shader);
-
+    lum_texture2d_destroy(&texture);
     lum_text_destroy_renderer(&tr);
     glfwDestroyWindow(window);
     glfwTerminate();
