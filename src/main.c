@@ -15,51 +15,13 @@
 #include "file_read.h"
 #include "shader.h"
 #include "texture.h"
-
-// 窗口尺寸变化时的回调
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-  glViewport(0, 0, width, height);
-}
-
-// 处理输入
-void processInput(GLFWwindow *window) {
-    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, 1);
-}
-
-GLuint lum_texture_create_2D_from_dir_with_options(const char* path, GLint wrap_s, GLint wrap_t, GLint min_filter, GLint max_filter, bool flip_vertically) {
-  GLuint texture;
-  glGenTextures(1, &texture);
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, texture);
-
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, max_filter);
-
-  stbi_set_flip_vertically_on_load(flip_vertically);
-  
-  int width, height, channels;
-  unsigned char* data = stbi_load(path, &width, &height, &channels, 0);
-  if (data && (channels == 1 || channels == 3 || channels == 4)) {
-    GLenum format = channels == 1 ? GL_RED : channels == 3 ? GL_RGB : GL_RGBA;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-  } else {
-    glDeleteTextures(1, &texture);
-    fprintf(stderr, "Failed to load texture.");
-    
-    return 0;
-  }
-  stbi_image_free(data);
-  
-  return texture;
-}
-
-GLuint lum_texture_create_2D_from_dir(const char* path, bool flip_vertically) {
-  return lum_texture_create_2D_from_dir_with_options(path, GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, flip_vertically);
-}
+#include "renderer.h"
+#include "renderer2d.h"
+#include "transform.h"
+#include "camera.h"
+#include "window.h"
+#include "input_codes.h"
+#include "input.h"
 
 typedef struct lum_Glyph {
   GLuint texture;
@@ -162,7 +124,6 @@ int lum_text_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
 }
 
 void lum_text_draw(lum_Text_renderer* tr, const char* text, float x, float y, float r, float g, float b, int screen_w, int screen_h) {
-  
   assert(tr && text);
 
   glUseProgram(tr->shader);
@@ -259,140 +220,51 @@ void lum_text_destroy_renderer(lum_Text_renderer* tr) {
 }
 
 int main() {
-  const char *vertexShaderSource = lum_file_read("shaders/vertex.shader");
-  const char *fragmentShaderSource = lum_file_read("shaders/fragment.shader");
   const char *text_vertex_source = lum_file_read("shaders/text_renderer_vertex.shader");
   const char *text_fragment_source = lum_file_read("shaders/text_renderer_fragment.shader");
 
-  // 1. 初始化 GLFW
-    if (!glfwInit()) {
-        fprintf(stderr, "Failed to initialize GLFW\n");
-        return -1;
-    }
-    // 指定使用 OpenGL 3.3 核心模式
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  lum_window_init("playground", 800, 600);
+  lum_input_init();
+  lum_renderer_set_viewport(0, 0, (int)lum_window_get_width(), (int)lum_window_get_height());
 
-    // 2. 创建窗口
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Luminous Playground", NULL, NULL);
-    if (window == NULL) {
-        fprintf(stderr, "Failed to create GLFW window\n");
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-    // 设置视口回调
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  lum_Texture2d texture;
+  lum_texture2d_load_from_file(&texture, "resources/texture.jpg", 0);
 
-    // 3. 初始化 GLAD（加载 OpenGL 函数）
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        fprintf(stderr, "Failed to initialize GLAD\n");
-        return -1;
-    }
+  lum_Text_renderer tr;
+  if (!lum_text_initialize_renderer(&tr, "resources/FiraCode-Regular.ttf", 48.0f)) {
+    fprintf(stderr, "Failed to initialize text renderer.");
+  }
 
-    // 4. 设置视口（初始值）
-    glViewport(0, 0, 800, 600);
+  lum_renderer2d_init(800, 600, lum_file_read("shaders/sprite.vert"), lum_file_read("shaders/sprite.frag"));
+  lum_renderer2d_enable_blend();
+  
+  lum_Camera2d camera;
+  lum_camera2d_init(&camera, lum_window_get_width(), lum_window_get_height());
+  
+  while (lum_window_is_open()) {
+	lum_renderer2d_begin_frame();
 
-    lum_Shader shader;
-    lum_shader_create_from_source(&shader, vertexShaderSource, fragmentShaderSource);
-
-    // 6. 定义三角形顶点数据
-    float vertices[] = {
-        // positions        // texCoords
-         0.5f,  0.5f, 0.0f, 1.0f, 1.0f,
-         0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
-        -0.5f,  0.5f, 0.0f, 0.0f, 1.0f
-    };
-
-    unsigned int indices[] = {
-        0, 1, 3,
-        1, 2, 3
-    };
-
-    unsigned int VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    // 解绑（可选，但保持整洁）
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
-    lum_Texture2d texture;
-    lum_texture2d_load_from_file(&texture, "resources/texture.jpg", 0);
-    lum_texture2d_bind(&texture, 0);
-
-    shader.initialized = true;
-    lum_shader_uniform_set1i(&shader, "texture1", 0);
-
-    lum_Text_renderer tr;
-    if (!lum_text_initialize_renderer(&tr, "resources/FiraCode-Regular.ttf", 48.0f)) {
-      fprintf(stderr, "Failed to initialize text renderer.");
-    }
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    
-  lum_Quad quad;
-  assert(lum_quad_init(&quad));
-  assert(lum_float_nearly_equal(1.0f, 1.1f, 0.000001f, 0.1f));
-
-  lum_Mat4 m = lum_mat4_translate(5.0f, 0.0f, 2.0f), m1 = lum_mat4_rotate_z(lum_deg_to_rad(lum_rad_to_deg(Lum_Pi / 2)));
-  lum_mat4_print(m);
-  lum_Vec4 v = lum_vec4_create(90.0f, 20.0f, 35.0f, 1.0f);
-  printf("\n");
-  lum_mat4_print(m1);
-  printf("\n");
-  lum_vec4_print(v);
-  printf("\n");
-  lum_vec4_print(lum_mat4_mul_vec4(m, v));
-  printf("\n");
-  lum_vec4_print(lum_mat4_mul_vec4(m1, lum_mat4_mul_vec4(m, v)));
-        // 7. 渲染循环
-    while (!glfwWindowShouldClose(window)) {      
-        // 输入处理
-        processInput(window);
-
-        // 清屏（用深蓝灰色背景）
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-       	glBindVertexArray(0);
-	lum_texture2d_bind(&texture, 0);
+	lum_input_update();
 	
-        // 使用着色器程序并绘制三角形
-	lum_shader_use(&shader);
-
-	lum_quad_draw(&quad);
-
-	lum_text_draw(&tr, "Hello Luminous!", 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 800, 600);
+	lum_camera2d_set_viewport(&camera, lum_window_get_width(), lum_window_get_height());
+	lum_renderer2d_set_clear_color(lum_vec4_create(0.0f, 0.3f, 0.3f, 1.0f));
+	lum_renderer2d_clear();
 	
-        // 交换缓冲，轮询事件
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+	lum_camera2d_set_zoom(&camera, 0.2f);
+	lum_renderer2d_set_camera(&camera);
+	
+	lum_renderer2d_draw_rect_ex(lum_vec2_create(0.0f, 0.0f), lum_vec2_create(200.0f, 200.0f), 0.0f, lum_vec2_0(), !lum_input_is_mouse_down(Lum_Mouse_Button_1) ? lum_vec4_create(0, 0, 0, 0.5f) : lum_vec4_1());
+	lum_renderer2d_draw_sprite_ex(&texture, lum_vec2_create(-230.0f, 1000.0f), lum_vec2_create(texture.width, texture.height), 0.0f, lum_vec2_0(), lum_vec4_1()); 
+
+	lum_window_swap_buffers();
+	lum_window_poll_events();
+
+	lum_renderer2d_end_frame();
     }
 
-    // 8. 清理资源
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    lum_shader_destroy(&shader);
+    lum_renderer2d_shutdown();
     lum_texture2d_destroy(&texture);
     lum_text_destroy_renderer(&tr);
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    lum_window_shutdown();
     return 0;
 }

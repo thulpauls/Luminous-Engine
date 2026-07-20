@@ -14,9 +14,12 @@ lum_Transform2d lum_transform2d_create(lum_Vec2 position, lum_Vec2 size, lum_Vec
 
 void lum_transform2d_set_position(lum_Transform2d* t, lum_Vec2 position);
 void lum_transform2d_set_size(lum_Transform2d* t, lum_Vec2 size);
-void lum_transform2d_set_scale(lum_Transform2d* t, lum_Vec3 scale);
+void lum_transform2d_set_scale(lum_Transform2d* t, lum_Vec2 scale);
 void lum_transform2d_set_rotation(lum_Transform2d* t, float rad);
 void lum_transform2d_set_origin(lum_Transform2d* t, lum_Vec2 origin);
+void lum_transform2d_translate(lum_Transform2d* t, lum_Vec2 delta);
+void lum_transform2d_rotate(lum_Transform2d* t, float delta_rad);
+void lum_transform2d_set_center_origin(lum_Transform2d* t);
 
 lum_Mat4 lum_transform2d_get_matrix(const lum_Transform2d* t);
 
