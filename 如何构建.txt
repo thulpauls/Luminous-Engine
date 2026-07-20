@@ -1,4 +1,0 @@
-1.安装MinGW，cmake和GNU make
-2.在当前目录运行以下命令：cmake -G "MinGW Makefiles" -B build
-3.运行完毕后，项目内应出现新的build文件夹，在build文件夹下运行命令：make
-4.运行完毕后，build文件夹中应出现Luminous-playground.exe，双击运行即可
