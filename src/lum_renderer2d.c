@@ -327,7 +327,7 @@ void lum_renderer2d_end_frame(void) {
   if (!g_renderer2d.initialized) return;
 
   g_renderer2d.last_frame_command_count = g_renderer2d.command_count;
-  g_renderer2d.last_frame_quad_count = g_renderer2d.command_count;
+  g_renderer2d.last_frame_quad_count = 0;
   g_renderer2d.last_frame_batch_count = 0;
   g_renderer2d.last_frame_draw_call_count = 0;
 
@@ -339,6 +339,7 @@ void lum_renderer2d_end_frame(void) {
     const lum_RenderCommand* command = &g_renderer2d.commands[i];
     if (!lum_renderer2d_batch_can_accept(command)) lum_renderer2d_flush_batch();
     lum_renderer2d_batch_submit_command(command);
+    g_renderer2d.last_frame_quad_count++;
   }
 
   lum_renderer2d_flush_batch();

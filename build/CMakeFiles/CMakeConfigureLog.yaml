@@ -631,3 +631,172 @@ events:
         
       exitCode: 0
 ...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/local/share/cmake-3.31/Modules/CheckLibraryExists.cmake:78 (try_compile)"
+      - "/usr/local/share/cmake-3.31/Modules/FindX11.cmake:693 (check_library_exists)"
+      - "glfw-3.4/src/CMakeLists.txt:181 (find_package)"
+    checks:
+      - "Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so"
+    directories:
+      source: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-jSym5q"
+      binary: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-jSym5q"
+    cmakeVariables:
+      CMAKE_C_FLAGS: ""
+      CMAKE_C_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/home/runner/work/Luminous-Engine/Luminous-Engine/glfw-3.4/CMake/modules"
+    buildResult:
+      variable: "X11_LIB_X11_SOLO"
+      cached: true
+      stdout: |
+        Change Dir: '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-jSym5q'
+        
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_01973/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_01973.dir/build.make CMakeFiles/cmTC_01973.dir/build
+        gmake[1]: Entering directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-jSym5q'
+        Building C object CMakeFiles/cmTC_01973.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=XOpenDisplay -o CMakeFiles/cmTC_01973.dir/CheckFunctionExists.c.o -c /home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-jSym5q/CheckFunctionExists.c
+        Linking C executable cmTC_01973
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_01973.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=XOpenDisplay CMakeFiles/cmTC_01973.dir/CheckFunctionExists.c.o -o cmTC_01973  /usr/lib/x86_64-linux-gnu/libX11.so /usr/lib/x86_64-linux-gnu/libXext.so
+        gmake[1]: Leaving directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-jSym5q'
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/local/share/cmake-3.31/Modules/CheckFunctionExists.cmake:93 (try_compile)"
+      - "/usr/local/share/cmake-3.31/Modules/FindX11.cmake:708 (check_function_exists)"
+      - "glfw-3.4/src/CMakeLists.txt:181 (find_package)"
+    checks:
+      - "Looking for gethostbyname"
+    directories:
+      source: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-bYEBS7"
+      binary: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-bYEBS7"
+    cmakeVariables:
+      CMAKE_C_FLAGS: ""
+      CMAKE_C_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/home/runner/work/Luminous-Engine/Luminous-Engine/glfw-3.4/CMake/modules"
+    buildResult:
+      variable: "CMAKE_HAVE_GETHOSTBYNAME"
+      cached: true
+      stdout: |
+        Change Dir: '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-bYEBS7'
+        
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_8cf21/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_8cf21.dir/build.make CMakeFiles/cmTC_8cf21.dir/build
+        gmake[1]: Entering directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-bYEBS7'
+        Building C object CMakeFiles/cmTC_8cf21.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=gethostbyname -o CMakeFiles/cmTC_8cf21.dir/CheckFunctionExists.c.o -c /home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-bYEBS7/CheckFunctionExists.c
+        Linking C executable cmTC_8cf21
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_8cf21.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=gethostbyname CMakeFiles/cmTC_8cf21.dir/CheckFunctionExists.c.o -o cmTC_8cf21
+        gmake[1]: Leaving directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-bYEBS7'
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/local/share/cmake-3.31/Modules/CheckFunctionExists.cmake:93 (try_compile)"
+      - "/usr/local/share/cmake-3.31/Modules/FindX11.cmake:722 (check_function_exists)"
+      - "glfw-3.4/src/CMakeLists.txt:181 (find_package)"
+    checks:
+      - "Looking for connect"
+    directories:
+      source: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-0oYC9c"
+      binary: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-0oYC9c"
+    cmakeVariables:
+      CMAKE_C_FLAGS: ""
+      CMAKE_C_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/home/runner/work/Luminous-Engine/Luminous-Engine/glfw-3.4/CMake/modules"
+    buildResult:
+      variable: "CMAKE_HAVE_CONNECT"
+      cached: true
+      stdout: |
+        Change Dir: '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-0oYC9c'
+        
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_fcc31/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_fcc31.dir/build.make CMakeFiles/cmTC_fcc31.dir/build
+        gmake[1]: Entering directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-0oYC9c'
+        Building C object CMakeFiles/cmTC_fcc31.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=connect -o CMakeFiles/cmTC_fcc31.dir/CheckFunctionExists.c.o -c /home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-0oYC9c/CheckFunctionExists.c
+        Linking C executable cmTC_fcc31
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fcc31.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=connect CMakeFiles/cmTC_fcc31.dir/CheckFunctionExists.c.o -o cmTC_fcc31
+        gmake[1]: Leaving directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-0oYC9c'
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/local/share/cmake-3.31/Modules/CheckFunctionExists.cmake:93 (try_compile)"
+      - "/usr/local/share/cmake-3.31/Modules/FindX11.cmake:731 (check_function_exists)"
+      - "glfw-3.4/src/CMakeLists.txt:181 (find_package)"
+    checks:
+      - "Looking for remove"
+    directories:
+      source: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-SijCYk"
+      binary: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-SijCYk"
+    cmakeVariables:
+      CMAKE_C_FLAGS: ""
+      CMAKE_C_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/home/runner/work/Luminous-Engine/Luminous-Engine/glfw-3.4/CMake/modules"
+    buildResult:
+      variable: "CMAKE_HAVE_REMOVE"
+      cached: true
+      stdout: |
+        Change Dir: '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-SijCYk'
+        
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_73b98/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_73b98.dir/build.make CMakeFiles/cmTC_73b98.dir/build
+        gmake[1]: Entering directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-SijCYk'
+        Building C object CMakeFiles/cmTC_73b98.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=remove -o CMakeFiles/cmTC_73b98.dir/CheckFunctionExists.c.o -c /home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-SijCYk/CheckFunctionExists.c
+        Linking C executable cmTC_73b98
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_73b98.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=remove CMakeFiles/cmTC_73b98.dir/CheckFunctionExists.c.o -o cmTC_73b98
+        gmake[1]: Leaving directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-SijCYk'
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/local/share/cmake-3.31/Modules/CheckFunctionExists.cmake:93 (try_compile)"
+      - "/usr/local/share/cmake-3.31/Modules/FindX11.cmake:740 (check_function_exists)"
+      - "glfw-3.4/src/CMakeLists.txt:181 (find_package)"
+    checks:
+      - "Looking for shmat"
+    directories:
+      source: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-rpr9Xz"
+      binary: "/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-rpr9Xz"
+    cmakeVariables:
+      CMAKE_C_FLAGS: ""
+      CMAKE_C_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/home/runner/work/Luminous-Engine/Luminous-Engine/glfw-3.4/CMake/modules"
+    buildResult:
+      variable: "CMAKE_HAVE_SHMAT"
+      cached: true
+      stdout: |
+        Change Dir: '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-rpr9Xz'
+        
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_78d22/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_78d22.dir/build.make CMakeFiles/cmTC_78d22.dir/build
+        gmake[1]: Entering directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-rpr9Xz'
+        Building C object CMakeFiles/cmTC_78d22.dir/CheckFunctionExists.c.o
+        /usr/bin/cc   -DCHECK_FUNCTION_EXISTS=shmat -o CMakeFiles/cmTC_78d22.dir/CheckFunctionExists.c.o -c /home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-rpr9Xz/CheckFunctionExists.c
+        Linking C executable cmTC_78d22
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_78d22.dir/link.txt --verbose=1
+        /usr/bin/cc  -DCHECK_FUNCTION_EXISTS=shmat CMakeFiles/cmTC_78d22.dir/CheckFunctionExists.c.o -o cmTC_78d22
+        gmake[1]: Leaving directory '/home/runner/work/Luminous-Engine/Luminous-Engine/build/CMakeFiles/CMakeScratch/TryCompile-rpr9Xz'
+        
+      exitCode: 0
+...
