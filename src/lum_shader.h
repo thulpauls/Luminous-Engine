@@ -1,6 +1,7 @@
 #ifndef Lum_Shader_H
 #define Lum_Shader_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "lum_math2d.h"
 

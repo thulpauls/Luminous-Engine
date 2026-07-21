@@ -1,6 +1,7 @@
 #ifndef Lum_Renderer_H
 #define Lum_Renderer_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "lum_math2d.h"

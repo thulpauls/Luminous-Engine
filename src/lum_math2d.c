@@ -141,6 +141,7 @@ lum_Vec3 lum_vec3_create(float x, float y, float z) {
   v.x = x;
   v.y = y;
   v.z = z;
+  return v;
 }
 
 lum_Vec3 lum_vec3_0(void) {
@@ -330,6 +331,7 @@ lum_Vec2 lum_rect_corner(lum_Rect r, uint8_t index) {
   case 2: return lum_vec2_create(r.position.x + r.size.x, r.position.y + r.size.y);
   case 3: return lum_vec2_create(r.position.x, r.position.y + r.size.y);
   }
+  return r.position;
 }
 
 int lum_rect_eq(lum_Rect a, lum_Rect b) {

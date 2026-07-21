@@ -1,6 +1,7 @@
 #ifndef Lum_Window_H
 #define Lum_Window_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 int lum_window_init(const char* title, uint32_t w, uint32_t h);

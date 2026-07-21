@@ -1,6 +1,8 @@
 #ifndef Lum_Quad_H
 #define Lum_Quad_H
 
+#include <stdbool.h>
+
 typedef struct lum_Quad {
   unsigned int VAO, VBO, EBO;
   bool initialized;

@@ -1,6 +1,7 @@
 #ifndef Lum_Time_H
 #define Lum_Time_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifndef Lum_Sleep_Margin

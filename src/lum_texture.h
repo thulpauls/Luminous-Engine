@@ -1,6 +1,7 @@
 #ifndef Lum_Texture_H
 #define Lum_Texture_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 

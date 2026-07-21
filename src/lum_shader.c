@@ -46,8 +46,8 @@ uint32_t lum_shader_link_shaders(const unsigned int vertex, const unsigned int f
 }
 
 uint32_t lum_shader_create_program_from_source(const char* vertex_source, const char* fragment_source) {
-  auto vertex_shader   = lum_shader_compile_from_source(vertex_source, GL_VERTEX_SHADER);
-  auto fragment_shader = lum_shader_compile_from_source(fragment_source, GL_FRAGMENT_SHADER);
+  uint32_t vertex_shader = lum_shader_compile_from_source(vertex_source, GL_VERTEX_SHADER);
+  uint32_t fragment_shader = lum_shader_compile_from_source(fragment_source, GL_FRAGMENT_SHADER);
 
   if (!(vertex_shader && fragment_shader)) {
     glDeleteShader(vertex_shader);
@@ -55,7 +55,7 @@ uint32_t lum_shader_create_program_from_source(const char* vertex_source, const 
     return 0;
   }
   
-  auto shader_program = lum_shader_link_shaders(vertex_shader, fragment_shader);
+  uint32_t shader_program = lum_shader_link_shaders(vertex_shader, fragment_shader);
   glDeleteShader(vertex_shader);
   glDeleteShader(fragment_shader);
 
@@ -95,7 +95,7 @@ int lum_shader_get_uniform_location(const lum_Shader* shader, const char* name) 
 
 void lum_shader_uniform_set1i(const lum_Shader* shader, const char* name, int value) {
   assert(shader && name);
-  if (shader->initialized) return;
+  if (!shader->initialized) return;
   int loc = lum_shader_get_uniform_location(shader, name);
   if (loc < 0) return;
   glUniform1i(loc, value);
