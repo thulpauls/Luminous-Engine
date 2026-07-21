@@ -174,14 +174,14 @@ static int lum_renderer2d_command_compare(const void* left, const void* right) {
   const lum_RenderCommand* a = (const lum_RenderCommand*)left;
   const lum_RenderCommand* b = (const lum_RenderCommand*)right;
 
-  if (a->layer != b->layer) return a->layer < b->layer ? -1 : 1;
+  if (a->layer != b->layer) return (a->layer > b->layer) - (a->layer < b->layer);
 
   uint32_t a_texture_id = a->texture ? a->texture->id : 0;
   uint32_t b_texture_id = b->texture ? b->texture->id : 0;
-  if (a_texture_id != b_texture_id) return a_texture_id < b_texture_id ? -1 : 1;
+  if (a_texture_id != b_texture_id) return (a_texture_id > b_texture_id) - (a_texture_id < b_texture_id);
 
   if (a->sequence == b->sequence) return 0;
-  return a->sequence < b->sequence ? -1 : 1;
+  return (a->sequence > b->sequence) - (a->sequence < b->sequence);
 }
 
 static void lum_renderer2d_write_quad_vertices(const lum_RenderCommand* command) {
