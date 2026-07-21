@@ -1,7 +1,7 @@
 #ifndef Lum_Transform_H
 #define Lum_Transform_H
 
-#include "math2d.h"
+#include "lum_math2d.h"
 
 typedef struct lum_Transform2d {
   lum_Vec2 position, size, scale;

@@ -1,7 +1,7 @@
 #ifndef Lum_Camera_H
 #define Lum_Camera_H
 
-#include "math2d.h"
+#include "lum_math2d.h"
 
 typedef struct lum_Camera2d {
   lum_Vec2 position;

@@ -1,4 +1,4 @@
-#include "texture.h"
+#include "lum_texture.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>

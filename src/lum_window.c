@@ -1,8 +1,11 @@
-#include "window.h"
+#include "lum_window.h"
+#include "lum_math2d.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
+#include <time.h>
 
 typedef struct lum_Window {
   GLFWwindow* handle;
@@ -37,6 +40,10 @@ int lum_window_init(const char* title, uint32_t w, uint32_t h) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+#ifdef __APPLE__
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+  
   GLFWwindow* handle = glfwCreateWindow(w, h, title, NULL, NULL);
   if (!handle) {
     glfwTerminate();
@@ -59,7 +66,8 @@ int lum_window_init(const char* title, uint32_t w, uint32_t h) {
 
   glfwGetWindowSize(handle, &g_window.width, &g_window.height);
   glfwGetFramebufferSize(handle, &g_window.framebuffer_width, &g_window.framebuffer_height);
-
+  glViewport(0, 0, g_window.framebuffer_width, g_window.framebuffer_height);
+  
   return 1;
 }
 
@@ -123,6 +131,25 @@ uint32_t lum_window_get_framebuffer_width(void) {
 uint32_t lum_window_get_framebuffer_height(void) {
   if (!g_window.initialized) return 0;
   return g_window.framebuffer_height;
+}
+
+float lum_window_get_time(void) {
+  if (!g_window.initialized) return -1.0f;
+  return (float)glfwGetTime();
+}
+
+void lum_window_sleep(float sec) {
+  if (lum_float_is_zero(sec)) return;
+  assert(sec > 0.0f);
+  if (!g_window.initialized) return;
+  
+  struct timespec req;
+  struct timespec rem;
+  req.tv_sec = (time_t)sec;
+  req.tv_nsec = (long)((sec - (float)req.tv_sec) * 1000000000.0f);
+  while (nanosleep(&req, &rem) == -1 && errno == EINTR) {
+    req = rem;
+  }
 }
 
 void lum_window_set_should_close(bool value) {

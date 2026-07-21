@@ -1,7 +1,7 @@
-#include "renderer2d.h"
-#include "quad.h"
-#include "renderer.h"
-#include "shader.h"
+#include "lum_renderer2d.h"
+#include "lum_quad.h"
+#include "lum_renderer.h"
+#include "lum_shader.h"
 #include <string.h>
 #include <assert.h>
 

@@ -1,5 +1,5 @@
-#include "input.h"
-#include "window.h"
+#include "lum_input.h"
+#include "lum_window.h"
 #include <GLFW/glfw3.h>
 #include <string.h>
 #include <stddef.h>

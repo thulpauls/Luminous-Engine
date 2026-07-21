@@ -2,10 +2,10 @@
 #define Lum_Renderer2d_H
 
 #include <stdint.h>
-#include "math2d.h"
-#include "transform.h"
-#include "texture.h"
-#include "camera.h"
+#include "lum_math2d.h"
+#include "lum_transform.h"
+#include "lum_texture.h"
+#include "lum_camera.h"
 
 int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h, const char* vertex_shader_source, const char* fragment_shader_source);
 void lum_renderer2d_shutdown(void);

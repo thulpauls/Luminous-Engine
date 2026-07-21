@@ -1,8 +1,8 @@
 #ifndef Lum_Input_H
 #define Lum_Input_H
 
-#include "math2d.h"
-#include "input_codes.h"
+#include "lum_math2d.h"
+#include "lum_input_codes.h"
 
 int lum_input_init(void);
 void lum_input_shutdown(void);

@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 
-#include "math2d.h"
-#include "quad.h"
-#include "shader.h"
-#include "texture.h"
+#include "lum_math2d.h"
+#include "lum_quad.h"
+#include "lum_shader.h"
+#include "lum_texture.h"
 
 typedef struct lum_Renderer {
   uint32_t viewport_x, viewport_y, viewport_w, viewport_h;

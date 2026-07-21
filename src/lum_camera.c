@@ -1,4 +1,4 @@
-#include "camera.h"
+#include "lum_camera.h"
 #include <assert.h>
 
 void lum_camera2d_init(lum_Camera2d* camera, float viewport_w, float viewport_h) {

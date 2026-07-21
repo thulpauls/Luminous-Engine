@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "math2d.h"
+#include "lum_math2d.h"
 #ifdef Lum_Debug
 #include <stdio.h>
 #endif

@@ -1,5 +1,5 @@
-#include "transform.h"
-#include "math2d.h"
+#include "lum_transform.h"
+#include "lum_math2d.h"
 #include <assert.h>
 
 void lum_transform2d_init(lum_Transform2d* t) {

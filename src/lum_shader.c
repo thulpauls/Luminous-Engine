@@ -1,4 +1,4 @@
-#include "shader.h"
+#include "lum_shader.h"
 #include <stdio.h>
 #include <assert.h>
 #include <glad/glad.h>

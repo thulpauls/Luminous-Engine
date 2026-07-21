@@ -2,7 +2,7 @@
 #define Lum_Shader_H
 
 #include <stdint.h>
-#include "math2d.h"
+#include "lum_math2d.h"
 
 typedef struct lum_Shader {
   uint32_t program;

@@ -22,6 +22,9 @@ uint32_t lum_window_get_height(void);
 uint32_t lum_window_get_framebuffer_width(void);
 uint32_t lum_window_get_framebuffer_height(void);
 
+float lum_window_get_time(void);
+void lum_window_sleep(float sec);
+
 void lum_window_set_should_close(bool value);
 
 #endif

@@ -1,4 +1,4 @@
-#include "quad.h"
+#include "lum_quad.h"
 
 #include <glad/glad.h>
 #include <assert.h>

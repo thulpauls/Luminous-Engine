@@ -1,4 +1,4 @@
-#include "renderer.h"
+#include "lum_renderer.h"
 #include <string.h>
 #include <glad/glad.h>
 #include <assert.h>
