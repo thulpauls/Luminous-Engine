@@ -1,4 +1,4 @@
-\# 构建
+# 构建
 
 Step 1:在项目文件夹运行：cmake -B build
 
