@@ -32,7 +32,11 @@ int main() {
   lum_Texture2d texture;
   lum_texture2d_load_from_file(&texture, "resources/texture.jpg", 0);
 
-  lum_renderer2d_init(800, 600, lum_file_read("shaders/sprite.vert"), lum_file_read("shaders/sprite.frag"));
+  char* sprite_vertex_shader = lum_file_read("shaders/sprite.vert");
+  char* sprite_fragment_shader = lum_file_read("shaders/sprite.frag");
+  lum_renderer2d_init(800, 600, sprite_vertex_shader, sprite_fragment_shader);
+  free(sprite_vertex_shader);
+  free(sprite_fragment_shader);
   lum_renderer2d_set_viewport(0, 0, (int)lum_window_get_width(), (int)lum_window_get_height());
   lum_renderer2d_enable_blend();
   
@@ -61,11 +65,11 @@ int main() {
 	lum_renderer2d_draw_rect_ex(rect_pos, lum_vec2_create(200.0f, 200.0f), 0.0f, lum_vec2_0(), lum_vec4_1());
 	lum_renderer2d_draw_sprite_ex(&texture, lum_vec2_create(-230.0f, 1000.0f), lum_vec2_create(texture.width, texture.height), 0.0f, lum_vec2_0(), lum_vec4_1()); 
 
-	
+	lum_renderer2d_end_frame();
+ 	
 	lum_window_swap_buffers();
 	lum_window_poll_events();
 
-	lum_renderer2d_end_frame();
 	lum_time_end_frame();
 	lum_time_update();
     }

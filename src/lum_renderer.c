@@ -3,16 +3,6 @@
 #include <glad/glad.h>
 #include <assert.h>
 
-typedef struct lum_Renderer {
-  uint32_t viewport_x, viewport_y, viewport_w, viewport_h;
-
-  lum_Vec4 clear_color;
-  lum_Mat4 view_projection;
-  bool has_view_projection;
-
-  bool initialized;
-} lum_Renderer;
-
 static lum_Renderer g_renderer;
 
 static void lum_renderer_reset(void) {
