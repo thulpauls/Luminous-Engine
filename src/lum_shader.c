@@ -95,7 +95,7 @@ int lum_shader_get_uniform_location(const lum_Shader* shader, const char* name) 
 
 void lum_shader_uniform_set1i(const lum_Shader* shader, const char* name, int value) {
   assert(shader && name);
-  if (shader->initialized) return;
+  if (!shader->initialized) return;
   int loc = lum_shader_get_uniform_location(shader, name);
   if (loc < 0) return;
   glUniform1i(loc, value);

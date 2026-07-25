@@ -109,13 +109,13 @@ bool lum_input_is_mouse_down(lum_Mousebutton button) {
 bool lum_input_is_mouse_pressed(lum_Mousebutton button) {
   assert(button >= 0 && button <= Lum_Mouse_Button_Last);
   if (!g_input.initialized) return false;
-  return g_input.current_mouse_buttons[button] && !g_input.current_mouse_buttons[button];
+  return g_input.current_mouse_buttons[button] && !g_input.previous_mouse_buttons[button];
 }
 
 bool lum_input_is_mouse_released(lum_Mousebutton button) {
   assert(button >= 0 && button <= Lum_Mouse_Button_Last);
   if (!g_input.initialized) return false;
-  return g_input.current_mouse_buttons[button] && !g_input.current_mouse_buttons[button];
+  return !g_input.current_mouse_buttons[button] && g_input.previous_mouse_buttons[button];
 }
 
 lum_Vec2 lum_input_get_mouse_position(void) {

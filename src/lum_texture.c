@@ -22,7 +22,7 @@ uint32_t lum_texture_create_2d_with_options(const unsigned char* pixels, int wra
 
   if (channels == 1 || channels == 3 || channels == 4) {
     GLenum format = channels == 1 ? GL_RED : channels == 3 ? GL_RGB : GL_RGBA;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
   } else {
     glDeleteTextures(1, &texture);

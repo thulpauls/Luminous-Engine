@@ -10,12 +10,10 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "lum_quad.h"
 #include "lum_math2d.h"
 #include "lum_file_read.h"
 #include "lum_shader.h"
 #include "lum_texture.h"
-#include "lum_renderer.h"
 #include "lum_renderer2d.h"
 #include "lum_transform.h"
 #include "lum_camera.h"
@@ -39,7 +37,7 @@ int main() {
   lum_Camera2d camera;
   lum_camera2d_init(&camera, lum_window_get_width(), lum_window_get_height());
 
-  lum_Vec2 rect_pos = lum_vec2_0();
+  lum_Vec2 rect_pos = lum_vec2_create(200.0f, 200.0f);
 
   lum_time_set_max_fps(144.0f);
   while (lum_window_is_open()) {
@@ -61,11 +59,10 @@ int main() {
 	lum_renderer2d_draw_rect_ex(rect_pos, lum_vec2_create(200.0f, 200.0f), 0.0f, lum_vec2_0(), lum_vec4_1());
 	lum_renderer2d_draw_sprite_ex(&texture, lum_vec2_create(-230.0f, 1000.0f), lum_vec2_create(texture.width, texture.height), 0.0f, lum_vec2_0(), lum_vec4_1()); 
 
-	
+	lum_renderer2d_end_frame();
+
 	lum_window_swap_buffers();
 	lum_window_poll_events();
-
-	lum_renderer2d_end_frame();
 	lum_time_end_frame();
 	lum_time_update();
     }

@@ -10,18 +10,17 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "lum_quad.h"
 #include "lum_math2d.h"
 #include "lum_file_read.h"
 #include "lum_shader.h"
 #include "lum_texture.h"
-#include "lum_renderer.h"
 #include "lum_renderer2d.h"
 #include "lum_transform.h"
 #include "lum_camera.h"
 #include "lum_window.h"
 #include "lum_input_codes.h"
 #include "lum_input.h"
+#include "lum_time.h"
 
 /* 1.向量与矩阵                                                                                                         */
 /* lum_Vec2表示2维向量，lum_Vec3表示3维向量，lum_Vec4表示4维，lum_Mat4表示四阶矩阵.                                           */
@@ -82,10 +81,10 @@ int main() {
 	lum_renderer2d_draw_rect_ex(lum_vec2_create(0.0f, 0.0f), lum_vec2_create(200.0f, 200.0f), 0.0f, lum_vec2_0(), !lum_input_is_mouse_down(Lum_Mouse_Button_1) ? lum_vec4_create(0, 0, 0, 0.5f) : lum_vec4_1());
 	lum_renderer2d_draw_sprite_ex(&texture, lum_vec2_create(-230.0f, 1000.0f), lum_vec2_create(texture.width, texture.height), 0.0f, lum_vec2_0(), lum_vec4_1()); 
 
+	lum_renderer2d_end_frame();
+	
 	lum_window_swap_buffers();
 	lum_window_poll_events();
-
-	lum_renderer2d_end_frame();
     }
 
     lum_renderer2d_shutdown();

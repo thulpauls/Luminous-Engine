@@ -141,6 +141,7 @@ lum_Vec3 lum_vec3_create(float x, float y, float z) {
   v.x = x;
   v.y = y;
   v.z = z;
+  return v;
 }
 
 lum_Vec3 lum_vec3_0(void) {
