@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 

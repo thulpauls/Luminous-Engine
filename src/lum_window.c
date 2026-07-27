@@ -1,5 +1,6 @@
 #include "lum_window.h"
 #include "lum_math2d.h"
+#include "lum_log.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <string.h>
@@ -53,6 +54,7 @@ int lum_window_init(const char* title, uint32_t w, uint32_t h) {
   glfwMakeContextCurrent(handle);
 
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    Lum_Log_Fatal("Failed to initialize OpenGL functions.");
     glfwDestroyWindow(handle);
     glfwTerminate();
     return 0;

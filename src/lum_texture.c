@@ -1,9 +1,8 @@
 #include "lum_texture.h"
-
+#include "lum_log.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
-#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 
@@ -27,7 +26,7 @@ uint32_t lum_texture_create_2d_with_options(const unsigned char* pixels, int wra
     glGenerateMipmap(GL_TEXTURE_2D);
   } else {
     glDeleteTextures(1, &texture);
-    fprintf(stderr, "Failed to load texture.");
+    Lum_Log_Error("Failed to load texture.");
     
     return 0;
   }

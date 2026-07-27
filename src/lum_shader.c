@@ -1,5 +1,5 @@
 #include "lum_shader.h"
-#include <stdio.h>
+#include "lum_log.h"
 #include <assert.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -7,7 +7,7 @@
 uint32_t lum_shader_compile_from_source(const char* source, const uint32_t shader_type) {
   assert(source);
   GLint success;
-  char infoLog[512];
+  char info_log[512];
 
   GLuint shader = glCreateShader(shader_type);
   glShaderSource(shader, 1, &source, NULL);
@@ -15,8 +15,8 @@ uint32_t lum_shader_compile_from_source(const char* source, const uint32_t shade
   
   glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
-    glGetShaderInfoLog(shader, 512, NULL, infoLog);
-    fprintf(stderr, "Shader compilation failed: %s\n", infoLog);
+    glGetShaderInfoLog(shader, 512, NULL, info_log);
+    Lum_Log_Fatal("Shader compilation failed: %s\n", info_log);
     glDeleteShader(shader);
     return 0;
   }
@@ -27,7 +27,7 @@ uint32_t lum_shader_compile_from_source(const char* source, const uint32_t shade
 uint32_t lum_shader_link_shaders(const unsigned int vertex, const unsigned int fragment) {
   assert(vertex && fragment);
   GLint success;
-  char infoLog[512];
+  char info_log[512];
   
   GLuint shader_program = glCreateProgram();
   glAttachShader(shader_program, vertex);
@@ -36,8 +36,8 @@ uint32_t lum_shader_link_shaders(const unsigned int vertex, const unsigned int f
   
   glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
   if (!success) {
-    glGetProgramInfoLog(shader_program, 512, NULL, infoLog);
-    fprintf(stderr, "Shader program linking failed: %s\n", infoLog);
+    glGetProgramInfoLog(shader_program, 512, NULL, info_log);
+    Lum_Log_Fatal("Shader program linking failed: %s\n", info_log);
     glDeleteProgram(shader_program);
     return 0;
   }

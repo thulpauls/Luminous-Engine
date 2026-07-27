@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "lum_math2d.h"
+#include "lum_log.h"
 #ifdef Lum_Debug
 #include <stdio.h>
 #endif
@@ -359,7 +360,7 @@ lum_Mat4 lum_mat4_trans_2d_with_size_and_origin(lum_Vec2 pos, lum_Vec2 size, lum
   return lum_mat4_mul(t_pos, lum_mat4_mul(r, lum_mat4_mul(t_origin, s)));
 };
 
-
+//TODO: 接入lum_log
 #ifdef Lum_Debug
 void lum_vec2_print(lum_Vec2 v) {
   printf("[x]" "\e[7m" "%*.3f" "\e[0m  ",(lum_float_is_zero(v.x) ? 1 : (int)floor(log10((double)floor(fabsf(v.x)))) + 1) + 5, v.x);
