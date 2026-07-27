@@ -32,7 +32,7 @@ int lum_float_nearly_equal(float a, float b, float abs_epsilon, float rel_epsilo
   if (difference <= abs_epsilon) return 1;
 
   float abs_a = fabsf(a), abs_b = fabsf(b);
-  float max_ab = lum_maxf(a, b);
+  float max_ab = lum_maxf(abs_a, abs_b);
   return difference <= max_ab * rel_epsilon;
 }
 
@@ -356,7 +356,7 @@ lum_Mat4 lum_mat4_trans_2d_with_size_and_origin(lum_Vec2 pos, lum_Vec2 size, lum
   lum_Mat4 r = lum_mat4_rotate_z(rotation_rad);
   lum_Mat4 s = lum_mat4_scale(scale.x * size.x, scale.y * size.y, 1.0f);
   lum_Mat4 t_origin = lum_mat4_translate(-origin.x, -origin.y, 0.0f);
-  return lum_mat4_mul(t_pos, lum_mat4_mul(r, lum_mat4_mul(s, t_origin)));
+  return lum_mat4_mul(t_pos, lum_mat4_mul(r, lum_mat4_mul(t_origin, s)));
 };
 
 

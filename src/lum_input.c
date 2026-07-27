@@ -17,7 +17,7 @@ typedef struct lum_Input {
   lum_Vec2 mouse_position;
   lum_Vec2 mouse_position_delta;
   lum_Vec2 previous_mouse_position;
-  lum_Vec2 scroll;
+  lum_Vec2 scroll, scroll_acc;
 } lum_Input;
 
 static lum_Input g_input;
@@ -27,8 +27,8 @@ static void lum_input_reset(void) {
 }
 
 static void lum_input_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-  g_input.scroll.x += (float)xoffset;
-  g_input.scroll.y += (float)yoffset;
+  g_input.scroll_acc.x += (float)xoffset;
+  g_input.scroll_acc.y += (float)yoffset;
 }
 
 int lum_input_init(void) {
@@ -61,7 +61,8 @@ void lum_input_update(void) {
 
   memcpy(g_input.previous_keys, g_input.current_keys, sizeof(g_input.current_keys));
   memcpy(g_input.previous_mouse_buttons, g_input.current_mouse_buttons, sizeof(g_input.current_mouse_buttons));
-  g_input.scroll = lum_vec2_0();
+  g_input.scroll = g_input.scroll_acc;
+  g_input.scroll_acc = lum_vec2_0();
 
   for (size_t key = 0; key <= Lum_Key_Last; ++key) {
     int state = glfwGetKey(window, key);

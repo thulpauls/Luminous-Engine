@@ -2,6 +2,7 @@
 #define Lum_Shader_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "lum_math2d.h"
 
 typedef struct lum_Shader {

@@ -11,7 +11,7 @@
 #include <assert.h>
 
 #include "lum_math2d.h"
-#include "lum_file_read.h"
+#include "lum_filesystem.h"
 #include "lum_shader.h"
 #include "lum_texture.h"
 #include "lum_renderer2d.h"
@@ -30,7 +30,7 @@ int main() {
   lum_Texture2d texture;
   lum_texture2d_load_from_file(&texture, "resources/texture.jpg", 0);
 
-  lum_renderer2d_init(800, 600, lum_file_read("shaders/sprite.vert"), lum_file_read("shaders/sprite.frag"));
+  lum_renderer2d_init(800, 600, lum_fs_read("shaders/sprite.vert"), lum_fs_read("shaders/sprite.frag"));
   lum_renderer2d_set_viewport(0, 0, (int)lum_window_get_width(), (int)lum_window_get_height());
   lum_renderer2d_enable_blend();
   
@@ -40,9 +40,16 @@ int main() {
   lum_Vec2 rect_pos = lum_vec2_create(0.0f, 0.0f);
 
   lum_time_set_max_fps(144.0f);
+
+  lum_fs_write("test.txt", "Hello luminous!");
+  printf("%d\n", lum_fs_file_mtime("test.txt"));
+
+  float angle = 0.0f;
   while (lum_window_is_open()) {
     lum_time_begin_frame();
     lum_renderer2d_begin_frame();
+
+    lum_window_poll_events();
 
     lum_input_update();
 	
@@ -69,7 +76,10 @@ int main() {
 	
 	lum_renderer2d_clear();
 	lum_renderer2d_draw_rect_ex(rect_pos, lum_vec2_create(2500.0f, 2500.0f), 0.0f, lum_vec2_0(), lum_vec4_1());
-	lum_Vec4 tex_color = lum_vec4_0();
+	angle += 0.5f * lum_time_get_delta();
+  if (angle > Lum_Pi * 2) angle = 0.0f;
+  lum_renderer2d_draw_rect_ex(lum_vec2_create(0, 0), lum_vec2_create(2500.0f, 2500.0f), angle, lum_vec2_create(2500, 0), lum_vec4_create(1.0f, 0.5f, 1.0f, 0.3f));
+  lum_Vec4 tex_color = lum_vec4_0();
 	for (int i = -50000; i < 50000; i += 1000) {
 	  for (int j = -50000; j < 50000; j += 1000) {
 	    tex_color = lum_vec4_create((float)(i + 50000) / 100000, (float)(j + 50000) / 100000, (float)(i + 50000) / 100000, 1.0f);
@@ -82,11 +92,8 @@ int main() {
     lum_renderer2d_end_frame();
     
     lum_window_swap_buffers();
-    lum_window_poll_events();
     lum_time_end_frame();
     lum_time_update();
-
-    printf("FPS: %f\n", lum_time_get_fps());
   }
 
     lum_renderer2d_shutdown();

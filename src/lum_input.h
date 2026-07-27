@@ -1,6 +1,7 @@
 #ifndef Lum_Input_H
 #define Lum_Input_H
 
+#include <stdbool.h>
 #include "lum_math2d.h"
 #include "lum_input_codes.h"
 

@@ -55,7 +55,7 @@ lum_Mat4 lum_camera2d_get_view_matrix(const lum_Camera2d* camera) {
 
   lum_Mat4 t = lum_mat4_translate(-camera->position.x, -camera->position.y, 0.0f);
   lum_Mat4 r = lum_mat4_rotate_z(-camera->rotation);
-  return lum_mat4_mul(t, r);
+  return lum_mat4_mul(r, t);
 }
 
 lum_Mat4 lum_camera2d_get_projection_matrix(const lum_Camera2d* camera) {

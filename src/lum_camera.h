@@ -1,6 +1,7 @@
 #ifndef Lum_Camera_H
 #define Lum_Camera_H
 
+#include <stdbool.h>
 #include "lum_math2d.h"
 
 typedef struct lum_Camera2d {

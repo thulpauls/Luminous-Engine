@@ -19,6 +19,7 @@ uint32_t lum_texture_create_2d_with_options(const unsigned char* pixels, int wra
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, max_filter);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   if (channels == 1 || channels == 3 || channels == 4) {
     GLenum format = channels == 1 ? GL_RED : channels == 3 ? GL_RGB : GL_RGBA;

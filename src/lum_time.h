@@ -2,6 +2,7 @@
 #define Lum_Time_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef Lum_Sleep_Margin
 #define Lum_Sleep_Margin (0.030f)

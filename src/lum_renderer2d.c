@@ -143,7 +143,7 @@ static int lum_renderer2d_init_batch_buffers(void) {
 static int lum_renderer2d_ensure_command_capacity(uint32_t min_capacity) {
   if (g_renderer2d.command_capacity >= min_capacity) return 1;
 
-  uint32_t new_capacity = lum_maxf(g_renderer2d.command_capacity, Lum_Renderer2d_Initial_Command_Capacity);
+  uint32_t new_capacity = lum_maxi(g_renderer2d.command_capacity, Lum_Renderer2d_Initial_Command_Capacity);
   while (new_capacity < min_capacity) new_capacity *= 2u;
 
   lum_Render_command* new_commands = (lum_Render_command*)realloc(g_renderer2d.commands, sizeof(lum_Render_command) * new_capacity);
@@ -151,6 +151,7 @@ static int lum_renderer2d_ensure_command_capacity(uint32_t min_capacity) {
 
   g_renderer2d.commands = new_commands;
   g_renderer2d.command_capacity = new_capacity;
+  return 1;
 }
 
 static int lum_renderer2d_push_command(const lum_Texture2d* texture, lum_Mat4 model, int32_t layer, lum_Vec4 color) {
@@ -163,6 +164,7 @@ static int lum_renderer2d_push_command(const lum_Texture2d* texture, lum_Mat4 mo
   command->color = color;
   command->layer = layer;
   command->sequence = g_renderer2d.next_sequence++;
+  return 1;
 }
 
 static int lum_renderer2d_command_compare(const void* left, const void* right) {
@@ -272,6 +274,8 @@ int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h, const char* ve
 
   glDisable(GL_DEPTH_TEST);
 
+  g_renderer2d.initialized = true;
+
   if (!lum_shader_create_from_source(&g_renderer2d.sprite_shader, vertex_shader_source, fragment_shader_source)) {
     lum_renderer2d_shutdown();
     return 0;
@@ -288,7 +292,6 @@ int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h, const char* ve
     return 0;
   }
 
-  g_renderer2d.initialized = true;
   return 1;
 }
 
@@ -408,9 +411,6 @@ void lum_renderer2d_draw_sprite_layer(const lum_Texture2d* texture, const lum_Tr
 }
 
 void lum_renderer2d_draw_rect_layer(const lum_Transform2d* transform, int32_t layer, lum_Vec4 color) {
-  assert(transform);
-  if (!g_renderer2d.initialized) return;
-
   lum_renderer2d_draw_sprite_layer(&g_renderer2d.white_texture, transform, layer, color);
 }
 
@@ -430,6 +430,5 @@ void lum_renderer2d_draw_sprite_ex_layer(const lum_Texture2d* texture, lum_Vec2 
 }
 
 void lum_renderer2d_draw_rect_ex_layer(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color) {
-  if (!g_renderer2d.initialized) return;
   lum_renderer2d_draw_sprite_ex_layer(&g_renderer2d.white_texture, position, size, rotation_rad, origin, layer, color);
 }

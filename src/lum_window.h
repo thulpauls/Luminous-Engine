@@ -2,6 +2,7 @@
 #define Lum_Window_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 int lum_window_init(const char* title, uint32_t w, uint32_t h);
 void lum_window_shutdown(void);

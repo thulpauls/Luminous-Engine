@@ -2,6 +2,7 @@
 #define Lum_Renderer2d_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "lum_math2d.h"
 #include "lum_transform.h"
 #include "lum_texture.h"
