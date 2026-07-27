@@ -31,7 +31,5 @@ make
 cd build
 ./Luminous_example
 ```
-
 注意：`example.c` 会加载 `resources/texture.jpg` 和 `shaders/` 下的着色器，请确保从 `build/` 目录运行（CMake 会在配置时自动复制 `resources` 和 `shaders` 到 `build/`）。
-
 ```
