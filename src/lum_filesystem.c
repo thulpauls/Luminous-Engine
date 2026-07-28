@@ -11,7 +11,7 @@ static unsigned char* lum__read(const char* filename, size_t* size, bool null_te
   
   FILE* fp = fopen(filename, "rb");
   if (!fp) {
-    Lum_Log_Fatal("Failed to open file: %s\n", filename);
+    Lum_Log_Error("Failed to open file: %s", filename);
     return NULL;
   }
 
@@ -67,21 +67,21 @@ int lum_fs_write_binary(const char* filename, const unsigned char* data, size_t 
 
   FILE* fp = fopen(filename, "wb");
   if (!fp) {
-    Lum_Log_Fatal("Failed to open file: %s\n", filename);
+    Lum_Log_Error("Failed to open file: %s", filename);
     return 0;
   }
 
   if (size > 0) {
     size_t written = fwrite(data, 1, size, fp);
     if (written != size) {
-      Lum_Log_Fatal("Failed to write file: %s\n", filename);
+      Lum_Log_Error("Failed to write file: %s", filename);
       fclose(fp);
       return 0;
     }
   }
 
   if (fclose(fp) != 0) {
-    Lum_Log_Fatal("Failed to flush file: %s\n", filename);
+    Lum_Log_Error("Failed to flush file: %s", filename);
     return 0;
   }
   return 1;

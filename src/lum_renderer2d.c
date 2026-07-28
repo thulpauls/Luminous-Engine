@@ -7,14 +7,81 @@
 #include <stdlib.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <math.h>
 
 #define Lum_Renderer2d_Initial_Command_Capacity (128u)
 #define Lum_Renderer2d_Max_Batch_Quads (2048u)
 #define Lum_Renderer2d_Vertices_Per_Quad (4u)
 #define Lum_Renderer2d_Indices_Per_Quad (6u)
 
+static const char* sprite_vertex_shader =
+  "#version 330 core\n"
+  "\n"
+  "layout(location = 0) in vec3 aPos;\n"
+  "layout(location = 1) in vec2 aUV;\n"
+  "layout(location = 2) in vec4 aColor;\n"
+  "\n"
+  "uniform mat4 u_view_projection;\n"
+  "\n"
+  "out vec2 vUV;\n"
+  "out vec4 vColor;\n"
+  "\n"
+  "void main() {\n"
+  "    vUV = aUV;\n"
+  "    vColor = aColor;\n"
+  "    gl_Position = u_view_projection * vec4(aPos, 1.0);\n"
+  "}\n";
+
+static const char* sprite_fragment_shader =
+  "#version 330 core\n"
+  "\n"
+  "in vec2 vUV;\n"
+  "in vec4 vColor;\n"
+  "out vec4 FragColor;\n"
+  "\n"
+  "uniform sampler2D u_texture;\n"
+  "\n"
+  "void main() {\n"
+  "    FragColor = texture(u_texture, vUV) * vColor;\n"
+  "}\n";
+
+static const char* circle_vertex_shader =
+  "#version 330 core\n"
+  "\n"
+  "layout(location = 0) in vec3 aPos;\n"
+  "layout(location = 1) in vec2 aUV;\n"
+  "layout(location = 2) in vec4 aColor;\n"
+  "\n"
+  "uniform mat4 u_view_projection;\n"
+  "\n"
+  "out vec2 vLocalPos;\n"
+  "out vec4 vColor;\n"
+  "\n"
+  "void main() {\n"
+  "    vLocalPos = (aUV - 0.5) * 2.0;\n"
+  "    vColor = aColor;\n"
+  "    gl_Position = u_view_projection * vec4(aPos, 1.0);\n"
+  "}\n";
+
+static const char* circle_fragment_shader =
+  "#version 330 core\n"
+  "\n"
+  "in vec2 vLocalPos;\n"
+  "in vec4 vColor;\n"
+  "out vec4 FragColor;\n"
+  "\n"
+  "uniform sampler2D u_texture;\n"
+  "\n"
+  "void main() {\n"
+  "    float d = length(vLocalPos);\n"
+  "    float alpha = 1.0 - smoothstep(0.98, 1.0, d);\n"
+  "    if (alpha <= 0.0) discard;\n"
+  "    FragColor = vec4(vColor.rgb, vColor.a * alpha);\n"
+  "}\n";
+
 typedef struct lum_Render_command {
   const lum_Texture2d* texture;
+  lum_Shader* shader;
   lum_Mat4 model;
   lum_Vec4 color;
   int32_t layer;
@@ -33,7 +100,7 @@ typedef struct lum_Renderer2d {
   uint32_t viewport_x, viewport_y, viewport_w, viewport_h;
   lum_Vec4 clear_color;
   
-  lum_Shader sprite_shader;
+  lum_Shader sprite_shader, circle_shader;
   lum_Texture2d white_texture;
 
   lum_Mat4 view_projection;
@@ -48,14 +115,9 @@ typedef struct lum_Renderer2d {
   uint32_t batch_quad_count;
   const lum_Texture2d* batch_texture;
   int32_t batch_layer;
+  lum_Shader* batch_shader;
 
-  uint32_t current_frame_batch_count;
   uint32_t current_frame_draw_call_count;
-
-  uint32_t last_frame_command_count;
-  uint32_t last_frame_quad_count;
-  uint32_t last_frame_batch_count;
-  uint32_t last_frame_draw_call_count;
 } lum_Renderer2d;
 
 static lum_Renderer2d g_renderer2d;
@@ -68,6 +130,7 @@ static void lum_renderer2d_reset_batch(void) {
   g_renderer2d.batch_quad_count = 0;
   g_renderer2d.batch_texture = NULL;
   g_renderer2d.batch_layer = 0;
+  g_renderer2d.batch_shader = NULL;
 }
 
 static void lum_renderer2d_destroy_batch_buffers(void) {
@@ -153,7 +216,7 @@ static int lum_renderer2d_ensure_command_capacity(uint32_t min_capacity) {
   return 1;
 }
 
-static int lum_renderer2d_push_command(const lum_Texture2d* texture, lum_Mat4 model, int32_t layer, lum_Vec4 color) {
+static int lum_renderer2d_push_command(const lum_Texture2d* texture, lum_Mat4 model, int32_t layer, lum_Vec4 color, lum_Shader* shader) {
   assert(texture);
   if (!lum_renderer2d_ensure_command_capacity(g_renderer2d.command_count + 1u)) return 0;
 
@@ -162,6 +225,7 @@ static int lum_renderer2d_push_command(const lum_Texture2d* texture, lum_Mat4 mo
   command->model = model;
   command->color = color;
   command->layer = layer;
+  command->shader = shader;
   command->sequence = g_renderer2d.next_sequence++;
   return 1;
 }
@@ -171,6 +235,8 @@ static int lum_renderer2d_command_compare(const void* left, const void* right) {
   const lum_Render_command* b = (const lum_Render_command*)right;
 
   if (a->layer != b->layer) return (a->layer > b->layer) - (a->layer < b->layer);
+
+  if (a->shader->program != b->shader->program) return (a->shader->program > b->shader->program) - (a->shader->program < b->shader->program);
 
   uint32_t a_tex = a->texture ? a->texture->id : 0;
   uint32_t b_tex = b->texture ? b->texture->id : 0;
@@ -214,7 +280,8 @@ static int lum_renderer2d_batch_can_accept(const lum_Render_command* command) {
   assert(command);
   
   if (g_renderer2d.batch_quad_count >= Lum_Renderer2d_Max_Batch_Quads) return 0;
-  if (!g_renderer2d.batch_texture) return 1;
+  if (!g_renderer2d.batch_texture || !g_renderer2d.batch_shader) return 1;
+  if (g_renderer2d.batch_shader != command->shader) return 0;
   if (g_renderer2d.batch_layer != command->layer) return 0;
   return g_renderer2d.batch_texture == command->texture;
 }
@@ -224,6 +291,10 @@ static void lum_renderer2d_batch_submit_command(const lum_Render_command* comman
   if (!g_renderer2d.batch_texture) {
     g_renderer2d.batch_texture = command->texture;
     g_renderer2d.batch_layer = command->layer;
+  }
+
+  if (!g_renderer2d.batch_shader) {
+    g_renderer2d.batch_shader = command->shader;
   }
   
   lum_renderer2d_write_quad_vertices(command);
@@ -236,9 +307,9 @@ static void lum_renderer2d_flush_batch(void) {
   if (g_renderer2d.has_view_projection && g_renderer2d.batch_texture) {
     size_t vertex_count = (size_t)g_renderer2d.batch_quad_count * Lum_Renderer2d_Vertices_Per_Quad;
 
-    lum_shader_use(&g_renderer2d.sprite_shader);
-    lum_shader_uniform_set4m(&g_renderer2d.sprite_shader, "u_view_projection", g_renderer2d.view_projection);
-    lum_shader_uniform_set1i(&g_renderer2d.sprite_shader, "u_texture", 0);
+    lum_shader_use(g_renderer2d.batch_shader);
+    lum_shader_uniform_set4m(g_renderer2d.batch_shader, "u_view_projection", g_renderer2d.view_projection);
+    lum_shader_uniform_set1i(g_renderer2d.batch_shader, "u_texture", 0);
 
     lum_texture2d_bind(g_renderer2d.batch_texture, 0);
 
@@ -250,15 +321,13 @@ static void lum_renderer2d_flush_batch(void) {
 
     lum_texture2d_unbind(0);
 
-    g_renderer2d.current_frame_batch_count++;
     g_renderer2d.current_frame_draw_call_count++;
   }
 
   lum_renderer2d_reset_batch();
 }
 
-int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h, const char* vertex_shader_source, const char* fragment_shader_source) {
-  assert(vertex_shader_source && fragment_shader_source);
+int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h) {
   lum_renderer2d_reset_state();
 
   g_renderer2d.viewport_x = 0;
@@ -275,18 +344,21 @@ int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h, const char* ve
 
   g_renderer2d.initialized = true;
 
-  if (!lum_shader_create_from_source(&g_renderer2d.sprite_shader, vertex_shader_source, fragment_shader_source)) {
+  if (!lum_shader_create_from_source(&g_renderer2d.sprite_shader, sprite_vertex_shader, sprite_fragment_shader) ||
+      !lum_shader_create_from_source(&g_renderer2d.circle_shader, circle_vertex_shader, circle_fragment_shader)) {
     lum_renderer2d_shutdown();
     return 0;
   }
   if (!lum_texture2d_create_white(&g_renderer2d.white_texture)) {
     lum_renderer2d_shutdown();
     lum_shader_destroy(&g_renderer2d.sprite_shader);
+    lum_shader_destroy(&g_renderer2d.circle_shader);
     return 0;
   }
   if (!lum_renderer2d_init_batch_buffers()) {
     lum_texture2d_destroy(&g_renderer2d.white_texture);
     lum_shader_destroy(&g_renderer2d.sprite_shader);
+    lum_shader_destroy(&g_renderer2d.circle_shader);
     lum_renderer2d_shutdown();
     return 0;
   }
@@ -332,7 +404,6 @@ void lum_renderer2d_begin_frame(void) {
 
   g_renderer2d.command_count = 0;
   g_renderer2d.next_sequence = 0;
-  g_renderer2d.current_frame_batch_count = 0;
   g_renderer2d.current_frame_draw_call_count = 0;
   lum_renderer2d_reset_batch();
 }
@@ -340,11 +411,6 @@ void lum_renderer2d_begin_frame(void) {
 void lum_renderer2d_end_frame(void) {
   if (!g_renderer2d.initialized) return;
   
-  g_renderer2d.last_frame_command_count = g_renderer2d.command_count;
-  g_renderer2d.last_frame_quad_count = 0;
-  g_renderer2d.last_frame_batch_count = 0;
-  g_renderer2d.last_frame_draw_call_count = 0;
-
   if (g_renderer2d.command_count > 1u)
     qsort(g_renderer2d.commands, g_renderer2d.command_count, sizeof(lum_Render_command), lum_renderer2d_command_compare);
 
@@ -352,12 +418,8 @@ void lum_renderer2d_end_frame(void) {
     const lum_Render_command* command = &g_renderer2d.commands[i];
     if (!lum_renderer2d_batch_can_accept(command)) lum_renderer2d_flush_batch();
     lum_renderer2d_batch_submit_command(command);
-    g_renderer2d.last_frame_quad_count++;
   }
   lum_renderer2d_flush_batch();
-
-  g_renderer2d.last_frame_batch_count = g_renderer2d.current_frame_batch_count;
-  g_renderer2d.last_frame_draw_call_count = g_renderer2d.current_frame_draw_call_count;
 }
 
 void lum_renderer2d_clear(void) {
@@ -406,7 +468,7 @@ void lum_renderer2d_draw_sprite_layer(const lum_Texture2d* texture, const lum_Tr
   if (!g_renderer2d.initialized) return;
   
   lum_Mat4 model = lum_transform2d_get_matrix(transform);
-  lum_renderer2d_push_command(texture, model, layer, color);
+  lum_renderer2d_push_command(texture, model, layer, color, &g_renderer2d.sprite_shader);
 }
 
 void lum_renderer2d_draw_rect_layer(const lum_Transform2d* transform, int32_t layer, lum_Vec4 color) {
@@ -430,4 +492,38 @@ void lum_renderer2d_draw_sprite_ex_layer(const lum_Texture2d* texture, lum_Vec2 
 
 void lum_renderer2d_draw_rect_ex_layer(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color) {
   lum_renderer2d_draw_sprite_ex_layer(&g_renderer2d.white_texture, position, size, rotation_rad, origin, layer, color);
+}
+
+void lum_renderer2d_draw_line(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Vec4 color) {
+  lum_renderer2d_draw_line_layer(start, end, thickness, 0, color);
+}
+
+void lum_renderer2d_draw_line_layer(lum_Vec2 start, lum_Vec2 end, float thickness, int32_t layer, lum_Vec4 color) {
+  if (!g_renderer2d.initialized || thickness < 0.0f) return;
+  lum_Vec2 d = lum_vec2_sub(start, end);
+  lum_Vec2 center = lum_vec2_lerp(start, end, 0.5f);
+
+  float len = lum_vec2_len(d);
+  if (lum_float_is_zero(len)) return;
+  float angle = atan2f(d.y, d.x);
+
+  lum_renderer2d_draw_rect_ex_layer(center, lum_vec2_create(len, thickness), angle, lum_vec2_create(len * 0.5f, thickness * 0.5f), layer, color);
+}
+
+void lum_renderer2d_draw_circle(lum_Vec2 position, float radius, lum_Vec4 color) {
+  lum_renderer2d_draw_circle_layer(position, radius, 0, color);
+}
+
+void lum_renderer2d_draw_circle_layer(lum_Vec2 position, float radius, int32_t layer, lum_Vec4 color) {
+  if (!g_renderer2d.initialized) return;
+  if (radius < 0.0f) return;
+  lum_Vec2 size = lum_vec2_scale(lum_vec2_create(radius, radius), 2.0f);
+  lum_Transform2d t = lum_transform2d_create(position, size, lum_vec2_1(), 0.0f, lum_vec2_scale(size, 0.5f));
+  lum_Mat4 model = lum_transform2d_get_matrix(&t);
+  lum_renderer2d_push_command(&g_renderer2d.white_texture, model, layer, color, &g_renderer2d.circle_shader);
+}
+
+uint32_t lum_renderer2d_get_draw_call_count(void) {
+  if (!g_renderer2d.initialized) return 0u;
+  return g_renderer2d.current_frame_draw_call_count;
 }

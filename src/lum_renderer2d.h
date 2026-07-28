@@ -8,7 +8,7 @@
 #include "lum_texture.h"
 #include "lum_camera.h"
 
-int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h, const char* vertex_shader_source, const char* fragment_shader_source);
+int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h);
 void lum_renderer2d_shutdown(void);
 
 bool lum_renderer2d_is_initialized(void);
@@ -35,5 +35,13 @@ void lum_renderer2d_draw_sprite_ex(const lum_Texture2d* texture, lum_Vec2 positi
 void lum_renderer2d_draw_rect_ex(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, lum_Vec4 color);
 void lum_renderer2d_draw_sprite_ex_layer(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color);
 void lum_renderer2d_draw_rect_ex_layer(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color);
+
+void lum_renderer2d_draw_line(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Vec4 color);
+void lum_renderer2d_draw_line_layer(lum_Vec2 start, lum_Vec2 end, float thickness, int32_t layer, lum_Vec4 color);
+
+void lum_renderer2d_draw_circle(lum_Vec2 position, float radius, lum_Vec4 color);
+void lum_renderer2d_draw_circle_layer(lum_Vec2 position, float radius, int32_t layer, lum_Vec4 color);
+
+uint32_t lum_renderer2d_get_draw_call_count(void);
 
 #endif //Lum_Renderer2d_H

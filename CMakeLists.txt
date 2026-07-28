@@ -29,5 +29,4 @@ add_library(Luminous STATIC ${LUM_ENGINE_SOURCES} glad.c)
 add_executable(Luminous_example example.c)
 target_link_libraries(Luminous_example Luminous glfw)
 
-file(COPY src/shaders DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

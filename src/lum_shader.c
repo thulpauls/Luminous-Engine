@@ -16,7 +16,7 @@ uint32_t lum_shader_compile_from_source(const char* source, const uint32_t shade
   glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     glGetShaderInfoLog(shader, 512, NULL, info_log);
-    Lum_Log_Fatal("Shader compilation failed: %s\n", info_log);
+    Lum_Log_Error("Shader compilation failed: %s", info_log);
     glDeleteShader(shader);
     return 0;
   }
@@ -37,7 +37,7 @@ uint32_t lum_shader_link_shaders(const unsigned int vertex, const unsigned int f
   glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
   if (!success) {
     glGetProgramInfoLog(shader_program, 512, NULL, info_log);
-    Lum_Log_Fatal("Shader program linking failed: %s\n", info_log);
+    Lum_Log_Error("Shader program linking failed: %s", info_log);
     glDeleteProgram(shader_program);
     return 0;
   }

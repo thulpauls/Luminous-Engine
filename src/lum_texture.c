@@ -5,6 +5,8 @@
 #include <stb_image.h>
 #include <assert.h>
 #include <string.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 uint32_t lum_texture_create_2d_with_options(const unsigned char* pixels, int wrap_s, int wrap_t, int min_filter, int max_filter, int width, int height, uint32_t channels) {
   assert(pixels);
