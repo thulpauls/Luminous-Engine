@@ -198,7 +198,8 @@ static void on_update(float dt) {
 
 static void on_render(void) {
   Snake_body* head = g_snake.head;
-  lum_renderer2d_draw_circle_layer(head->position, 7, 2, lum_vec4_create(0.5f, 1.0f, 0.5f, 1.0f));
+  lum_renderer2d_draw_circle_layer(g_new_position, 7, 2, lum_vec4_create(0.5f, 1.0f, 0.5f, 1.0f));
+  lum_renderer2d_draw_circle_layer(g_new_position, 15, 1, lum_vec4_create(0.3f, 0.8f, 0.3f, 1.0f));
   Snake_body* next = head;
   while (next) {
     lum_renderer2d_draw_circle_layer(next->position, 15, 1, lum_vec4_create(0.3f, 0.8f, 0.3f, 1.0f));
