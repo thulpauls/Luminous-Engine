@@ -29,4 +29,7 @@ lum_Mat4 lum_camera2d_get_view_matrix(const lum_Camera2d* camera);
 lum_Mat4 lum_camera2d_get_projection_matrix(const lum_Camera2d* camera);
 lum_Mat4 lum_camera2d_get_view_projection_matrix(const lum_Camera2d* camera);
 
+lum_Vec2 lum_camera2d_screen_to_world(const lum_Camera2d* cam, lum_Vec2 screen_pos, lum_Vec2 window_size);
+lum_Vec2 lum_camera2d_world_to_screen(const lum_Camera2d* cam, lum_Vec2 world_pos, lum_Vec2 window_size);
+
 #endif //Lum_Camera_H

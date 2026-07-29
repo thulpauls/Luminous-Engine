@@ -245,6 +245,48 @@ lum_Mat4 lum_mat4_mul(lum_Mat4 a, lum_Mat4 b) {
   return result;
 }
 
+lum_Mat4 lum_mat4_inv(lum_Mat4 m) {
+  float aug[4][8];
+  for (int c = 0; c < 4; ++c) {
+    for (int r = 0; r < 4; ++r) {
+      aug[r][c]     = m.m[c * 4 + r];
+      aug[r][c + 4] = (c == r) ? 1.0f : 0.0f;
+    }
+  }
+
+  for (int col = 0; col < 4; ++col) {
+    int pivot = col;
+    float max_abs = fabsf(aug[col][col]);
+    for (int r = col + 1; r < 4; ++r) {
+      float v = fabsf(aug[r][col]);
+      if (v > max_abs) { max_abs = v; pivot = r; }
+    }
+    if (max_abs < 1e-7f) return lum_mat4_identity();
+
+    if (pivot != col) {
+      for (int k = 0; k < 8; ++k) {
+        float tmp = aug[col][k]; aug[col][k] = aug[pivot][k]; aug[pivot][k] = tmp;
+      }
+    }
+
+    float inv_pivot = 1.0f / aug[col][col];
+    for (int k = 0; k < 8; ++k) aug[col][k] *= inv_pivot;
+
+    for (int r = 0; r < 4; ++r) {
+      if (r == col) continue;
+      float factor = aug[r][col];
+      if (factor == 0.0f) continue;
+      for (int k = 0; k < 8; ++k) aug[r][k] -= factor * aug[col][k];
+    }
+  }
+
+  lum_Mat4 inv = lum_mat4_0();
+  for (int c = 0; c < 4; ++c)
+    for (int r = 0; r < 4; ++r)
+      inv.m[c * 4 + r] = aug[r][c + 4];
+  return inv;
+}
+
 lum_Mat4 lum_mat4_translate(float x, float y, float z) {
   lum_Mat4 m = lum_mat4_identity();
   m.m[12] = x;

@@ -71,3 +71,30 @@ lum_Mat4 lum_camera2d_get_view_projection_matrix(const lum_Camera2d* camera) {
   assert(camera);
   return lum_mat4_mul(lum_camera2d_get_projection_matrix(camera), lum_camera2d_get_view_matrix(camera));
 }
+
+lum_Vec2 lum_camera2d_screen_to_world(const lum_Camera2d* cam, lum_Vec2 screen_pos, lum_Vec2 window_size) {
+  assert(cam && window_size.x > 0.0f && window_size.y > 0.0f);
+
+  lum_Vec4 ndc;
+  ndc.x = (screen_pos.x / window_size.x) * 2.0f - 1.0f;
+  ndc.y = 1.0f - (screen_pos.y / window_size.y) * 2.0f;
+  ndc.z = 0.0f;
+  ndc.w = 1.0f;
+
+  lum_Mat4 vp = lum_camera2d_get_view_projection_matrix(cam);
+  lum_Mat4 vp_inv = lum_mat4_inv(vp);
+  lum_Vec4 world = lum_mat4_mul_vec4(vp_inv, ndc);
+
+  return lum_vec2_create(world.x, world.y);
+}
+
+lum_Vec2 lum_camera2d_world_to_screen(const lum_Camera2d* cam, lum_Vec2 world_pos, lum_Vec2 window_size) {
+  assert(cam && window_size.x > 0.0f && window_size.y > 0.0f);
+
+  lum_Mat4 vp = lum_camera2d_get_view_projection_matrix(cam);
+  lum_Vec4 ndc = lum_mat4_mul_vec4(vp, lum_vec4_create(world_pos.x, world_pos.y, 0.0f, 1.0f));
+  lum_Vec2 screen;
+  screen.x = (ndc.x + 1.0f) * 0.5f * window_size.x;
+  screen.y = (1.0f - ndc.y) * 0.5f * window_size.y;
+  return screen;
+}

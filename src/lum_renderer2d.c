@@ -410,7 +410,7 @@ void lum_renderer2d_begin_frame(void) {
 
 void lum_renderer2d_end_frame(void) {
   if (!g_renderer2d.initialized) return;
-  
+
   if (g_renderer2d.command_count > 1u)
     qsort(g_renderer2d.commands, g_renderer2d.command_count, sizeof(lum_Render_command), lum_renderer2d_command_compare);
 

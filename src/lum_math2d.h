@@ -85,6 +85,7 @@ int lum_vec4_eq(lum_Vec4 a, lum_Vec4 b);
 lum_Mat4 lum_mat4_0(void);
 lum_Mat4 lum_mat4_identity(void);
 lum_Mat4 lum_mat4_mul(lum_Mat4 a, lum_Mat4 b);
+lum_Mat4 lum_mat4_inv(lum_Mat4 m);
 lum_Mat4 lum_mat4_translate(float x, float y, float z);
 lum_Mat4 lum_mat4_scale(float x, float y, float z);
 lum_Mat4 lum_mat4_rotate_z(float rad);
