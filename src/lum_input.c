@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <string.h>
 #include <stddef.h>
-#include <assert.h>
+#include "lum_assert.h"
 
 typedef struct lum_Input {
   bool initialized;
@@ -84,37 +84,37 @@ void lum_input_update(void) {
 }
 
 bool lum_input_is_key_down(lum_Keycode key) {
-  assert(key >= 0 && key <= Lum_Key_Last);
+  Lum_Assert(key >= 0 && key <= Lum_Key_Last);
   if (!g_input.initialized) return false;
   return g_input.current_keys[key];
 }
 
 bool lum_input_is_key_pressed(lum_Keycode key) {
-  assert(key >= 0 && key <= Lum_Key_Last);
+  Lum_Assert(key >= 0 && key <= Lum_Key_Last);
   if (!g_input.initialized) return false;
   return g_input.current_keys[key] && !g_input.previous_keys[key];
 }
 
 bool lum_input_is_key_released(lum_Keycode key) {
-  assert(key >= 0 && key <= Lum_Key_Last);
+  Lum_Assert(key >= 0 && key <= Lum_Key_Last);
   if (!g_input.initialized) return false;
   return !g_input.current_keys[key] && g_input.previous_keys[key];
 }
 
 bool lum_input_is_mouse_down(lum_Mousebutton button) {
-  assert(button >= 0 && button <= Lum_Mouse_Button_Last);
+  Lum_Assert(button >= 0 && button <= Lum_Mouse_Button_Last);
   if (!g_input.initialized) return false;
   return g_input.current_mouse_buttons[button];
 }
 
 bool lum_input_is_mouse_pressed(lum_Mousebutton button) {
-  assert(button >= 0 && button <= Lum_Mouse_Button_Last);
+  Lum_Assert(button >= 0 && button <= Lum_Mouse_Button_Last);
   if (!g_input.initialized) return false;
   return g_input.current_mouse_buttons[button] && !g_input.previous_mouse_buttons[button];
 }
 
 bool lum_input_is_mouse_released(lum_Mousebutton button) {
-  assert(button >= 0 && button <= Lum_Mouse_Button_Last);
+  Lum_Assert(button >= 0 && button <= Lum_Mouse_Button_Last);
   if (!g_input.initialized) return false;
   return !g_input.current_mouse_buttons[button] && g_input.previous_mouse_buttons[button];
 }

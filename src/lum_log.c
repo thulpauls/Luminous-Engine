@@ -61,6 +61,10 @@ int lum_log_init(void) {
     return 1;
 }
 
+bool lum_log_is_initialized(void) {
+    return g_log.initialized;
+}
+
 void lum_log_shutdown(void) {
     if (!g_log.initialized) return;
     if (g_log.file) {

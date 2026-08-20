@@ -2,7 +2,7 @@
 #include "lum_window.h"
 #include "lum_math2d.h"
 #include <string.h>
-#include <assert.h>
+#include "lum_assert.h"
 
 typedef struct lum_Time {
   bool initialized;
@@ -119,7 +119,7 @@ float lum_time_get_fps(void) {
 }
 
 void lum_time_set_fps_update_interval(float interval) {
-  assert(interval > 0.0f);
+  Lum_Assert(interval > 0.0f);
   if (!g_time.initialized) return;
   g_time.fps_update_interval = interval;
 }
@@ -141,7 +141,7 @@ uint32_t lum_time_get_max_fps(void) {
 }
 
 void lum_time_set_max_delta(float max) {
-  assert(max > 0.0f);
+  Lum_Assert(max > 0.0f);
   if (!g_time.initialized) return;
   g_time.max_delta = max;
 }

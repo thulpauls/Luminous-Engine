@@ -3,14 +3,13 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
-#include <assert.h>
+#include "lum_assert.h"
 #include <string.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 uint32_t lum_texture_create_2d_with_options(const unsigned char* pixels, int wrap_s, int wrap_t, int min_filter, int max_filter, int width, int height, uint32_t channels) {
-  assert(pixels);
-  
+  /* pixels 可为 NULL：glTexImage2D 只分配存储不上传（用于 FBO color 附件等）。 */
   GLuint texture;
   glGenTextures(1, &texture);
   glActiveTexture(GL_TEXTURE0);
@@ -41,7 +40,7 @@ uint32_t lum_texture_create_2d(const unsigned char* pixels, int width, int heigh
 }
 
 int lum_texture2d_create(lum_Texture2d* texture, int width, int height, uint32_t channels, const unsigned char* pixels) {
-  assert(texture);
+  Lum_Assert(texture);
 
   uint32_t id = lum_texture_create_2d(pixels, width, height, channels);
   if (!id) return 0;
@@ -60,7 +59,7 @@ int lum_texture2d_create_white(lum_Texture2d* texture) {
 }
 
 int lum_texture2d_load_from_file(lum_Texture2d* texture, const char* path, uint32_t desired_channels) {
-  assert(path);
+  Lum_Assert(path);
 
   int width, height, channels;
   stbi_set_flip_vertically_on_load(1);
@@ -75,7 +74,7 @@ int lum_texture2d_load_from_file(lum_Texture2d* texture, const char* path, uint3
 }
 
 void lum_texture2d_destroy(lum_Texture2d* texture) {
-  assert(texture);
+  Lum_Assert(texture);
   if (!texture->initialized) return;
 
   glDeleteTextures(1, &texture->id);
@@ -83,7 +82,7 @@ void lum_texture2d_destroy(lum_Texture2d* texture) {
 }
 
 void lum_texture2d_bind(const lum_Texture2d* texture, uint32_t slot) {
-  assert(texture);
+  Lum_Assert(texture);
   if (!texture->initialized) return;
 
   glActiveTexture(GL_TEXTURE0 + slot);

@@ -4,7 +4,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <string.h>
-#include <assert.h>
+#include "lum_assert.h"
 #include <errno.h>
 #include <time.h>
 
@@ -33,7 +33,7 @@ static void lum_window_size_callback(GLFWwindow* window, int w, int h) {
 }
 
 int lum_window_init(const char* title, uint32_t w, uint32_t h) {
-  assert(title);
+  Lum_Assert(title);
   lum_window_reset();
 
   if (!glfwInit()) return 0;
@@ -90,7 +90,7 @@ bool lum_window_is_open(void) {
 }
 
 void lum_window_set_title(const char* title) {
-  assert(title);
+  Lum_Assert(title);
   if (!g_window.initialized) return;
   glfwSetWindowTitle(g_window.handle, title);
 }
@@ -142,7 +142,7 @@ float lum_window_get_time(void) {
 
 void lum_window_sleep(float sec) {
   if (lum_float_is_zero(sec)) return;
-  assert(sec > 0.0f);
+  Lum_Assert(sec > 0.0f);
   if (!g_window.initialized) return;
   
   struct timespec req;

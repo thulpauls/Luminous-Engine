@@ -1,8 +1,8 @@
 #include "lum_camera.h"
-#include <assert.h>
+#include "lum_assert.h"
 
 void lum_camera2d_init(lum_Camera2d* camera, float viewport_w, float viewport_h) {
-  assert(camera);
+  Lum_Assert(camera);
 
   camera->position = lum_vec2_0();
   camera->rotation = 0.0f;
@@ -14,44 +14,44 @@ void lum_camera2d_init(lum_Camera2d* camera, float viewport_w, float viewport_h)
 }
 
 void lum_camera2d_set_position(lum_Camera2d* camera, lum_Vec2 position) {
-  assert(camera);
+  Lum_Assert(camera);
   camera->position = position;
 }
 
 void lum_camera2d_set_rotation(lum_Camera2d* camera, float rad) {
-  assert(camera);
+  Lum_Assert(camera);
   camera->rotation = rad;
 }
 
 void lum_camera2d_set_zoom(lum_Camera2d* camera, float zoom) {
-  assert(camera);
+  Lum_Assert(camera);
   camera->zoom = zoom > 0.0f ? zoom : 0.0001f;
 }
 
 void lum_camera2d_translate(lum_Camera2d* camera, lum_Vec2 delta) {
-  assert(camera);
+  Lum_Assert(camera);
   camera->position = lum_vec2_add(camera->position, delta);
 }
 
 void lum_camera2d_rotate(lum_Camera2d* camera, float delta_rad) {
-  assert(camera);
+  Lum_Assert(camera);
   camera->rotation += delta_rad;
 }
 
 void lum_camera2d_set_viewport(lum_Camera2d* camera, float w, float h) {
-  assert(camera);
+  Lum_Assert(camera);
   camera->viewport_w = w;
   camera->viewport_h = h;
 }
 
 void lum_camera2d_set_planes(lum_Camera2d* camera, float near, float far) {
-  assert(camera);
+  Lum_Assert(camera);
   camera->near_plane = near;
   camera->far_plane = far;
 }
 
 lum_Mat4 lum_camera2d_get_view_matrix(const lum_Camera2d* camera) {
-  assert(camera);
+  Lum_Assert(camera);
 
   lum_Mat4 t = lum_mat4_translate(-camera->position.x, -camera->position.y, 0.0f);
   lum_Mat4 r = lum_mat4_rotate_z(-camera->rotation);
@@ -59,7 +59,7 @@ lum_Mat4 lum_camera2d_get_view_matrix(const lum_Camera2d* camera) {
 }
 
 lum_Mat4 lum_camera2d_get_projection_matrix(const lum_Camera2d* camera) {
-  assert(camera);
+  Lum_Assert(camera);
 
   float width = camera->viewport_w / camera->zoom, height = camera->viewport_h / camera->zoom;
   float half_width = width * 0.5f, half_height = height * 0.5f;
@@ -68,12 +68,12 @@ lum_Mat4 lum_camera2d_get_projection_matrix(const lum_Camera2d* camera) {
 }
 
 lum_Mat4 lum_camera2d_get_view_projection_matrix(const lum_Camera2d* camera) {
-  assert(camera);
+  Lum_Assert(camera);
   return lum_mat4_mul(lum_camera2d_get_projection_matrix(camera), lum_camera2d_get_view_matrix(camera));
 }
 
 lum_Vec2 lum_camera2d_screen_to_world(const lum_Camera2d* cam, lum_Vec2 screen_pos, lum_Vec2 window_size) {
-  assert(cam && window_size.x > 0.0f && window_size.y > 0.0f);
+  Lum_Assert(cam && window_size.x > 0.0f && window_size.y > 0.0f);
 
   lum_Vec4 ndc;
   ndc.x = (screen_pos.x / window_size.x) * 2.0f - 1.0f;
@@ -89,7 +89,7 @@ lum_Vec2 lum_camera2d_screen_to_world(const lum_Camera2d* cam, lum_Vec2 screen_p
 }
 
 lum_Vec2 lum_camera2d_world_to_screen(const lum_Camera2d* cam, lum_Vec2 world_pos, lum_Vec2 window_size) {
-  assert(cam && window_size.x > 0.0f && window_size.y > 0.0f);
+  Lum_Assert(cam && window_size.x > 0.0f && window_size.y > 0.0f);
 
   lum_Mat4 vp = lum_camera2d_get_view_projection_matrix(cam);
   lum_Vec4 ndc = lum_mat4_mul_vec4(vp, lum_vec4_create(world_pos.x, world_pos.y, 0.0f, 1.0f));

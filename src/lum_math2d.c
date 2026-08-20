@@ -1,7 +1,6 @@
 #include <math.h>
-#include <assert.h>
+#include "lum_assert.h"
 #include <string.h>
-
 #include "lum_math2d.h"
 #include "lum_log.h"
 #ifdef Lum_Debug
@@ -54,7 +53,7 @@ float lum_rad_to_deg(float rad) {
 }
 
 float lum_clamp(float value, float min, float max) {
-  assert(min < max);
+  Lum_Assert(min < max);
   value = lum_minf(value, max);
   value = lum_maxf(value, min);
   return value;
@@ -92,7 +91,7 @@ lum_Vec2 lum_vec2_mul(lum_Vec2 a, lum_Vec2 b) {
 }
 
 lum_Vec2 lum_vec2_div(lum_Vec2 a, lum_Vec2 b) {
-  assert(!lum_float_is_zero(b.x) && !lum_float_is_zero(b.y));
+  Lum_Assert(!lum_float_is_zero(b.x) && !lum_float_is_zero(b.y));
   return lum_vec2_create(a.x / b.x, a.y / b.y);
 }
 
@@ -135,6 +134,10 @@ int lum_vec2_eq(lum_Vec2 a, lum_Vec2 b) {
 
 lum_Vec2 lum_vec2_from_angle(float rad) {
   return lum_vec2_create(cosf(rad), sinf(rad));
+}
+
+lum_Vec3 lum_vec2_to_vec3(lum_Vec2 v) {
+  return lum_vec3_create(v.x, v.y, 0.0f);
 }
 
 lum_Vec3 lum_vec3_create(float x, float y, float z) {
@@ -184,6 +187,10 @@ lum_Vec3 lum_vec3_normalise(lum_Vec3 v) {
 
 int lum_vec3_eq(lum_Vec3 a, lum_Vec3 b) {
   return lum_float_eq(a.x, b.x) && lum_float_eq(a.y, b.y) && lum_float_eq(a.z, b.z);
+}
+
+lum_Vec4 lum_vec3_to_vec4(lum_Vec3 v) {
+  return lum_vec4_create(v.x, v.y, v.z, 0.0f);
 }
 
 lum_Vec4 lum_vec4_create(float x, float y, float z, float w) {
@@ -367,7 +374,7 @@ lum_Vec2 lum_rect_center(lum_Rect r) {
 }
 
 lum_Vec2 lum_rect_corner(lum_Rect r, uint8_t index) {
-  assert(index < 4);
+  Lum_Assert(index < 4);
   switch(index) {
   case 0: return r.position;
   case 1: return lum_vec2_create(r.position.x + r.size.x, r.position.y);

@@ -16,6 +16,7 @@
 
 /* --- 基础层 --- */
 #include "lum_log.h"
+#include "lum_assert.h"
 #include "lum_math2d.h"
 
 /* --- 平台层 --- */
@@ -31,6 +32,11 @@
 #include "lum_camera.h"
 #include "lum_transform.h"
 #include "lum_renderer2d.h"
+#include "lum_material.h"
+#include "lum_render_target.h"
+
+/* --- 特效 --- */
+#include "effects/lum_glow.h"
 
 /* --- 子系统 --- */
 #include "lum_text_renderer.h"

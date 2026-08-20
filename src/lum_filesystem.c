@@ -1,13 +1,13 @@
 #include "lum_filesystem.h"
 #include "lum_log.h"
-#include <assert.h>
+#include "lum_assert.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <sys/stat.h>
 
 static unsigned char* lum__read(const char* filename, size_t* size, bool null_terminate) {
-  assert(filename);
+  Lum_Assert(filename);
   
   FILE* fp = fopen(filename, "rb");
   if (!fp) {
@@ -40,7 +40,7 @@ failure:
 }
 
 static int lum__stat(const char* path, struct stat* st) {
-  assert(path && st);
+  Lum_Assert(path && st);
   return stat(path, st) == 0;
 }
 
@@ -62,7 +62,7 @@ lum_Binary_file lum_fs_read_binary(const char* filename) {
 }
 
 int lum_fs_write_binary(const char* filename, const unsigned char* data, size_t size) {
-  assert(filename);
+  Lum_Assert(filename);
   if (size > 0 && !data) return 0;
 
   FILE* fp = fopen(filename, "wb");
@@ -88,7 +88,7 @@ int lum_fs_write_binary(const char* filename, const unsigned char* data, size_t 
 }
 
 int lum_fs_write(const char* filename, const char* text) {
-  assert(text);
+  Lum_Assert(text);
   return lum_fs_write_binary(filename, text, strlen(text));
 }
 

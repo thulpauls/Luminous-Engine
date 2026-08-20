@@ -15,6 +15,7 @@ uint32_t lum_shader_link_shaders(const unsigned int vertex, const unsigned int f
 uint32_t lum_shader_create_program_from_source(const char* vertex_source, const char* fragment_source);
 
 int lum_shader_create_from_source(lum_Shader* shader, const char* vertex_source, const char* fragment_source);
+int lum_shader_create_from_file(lum_Shader* shader, const char* vertex_path, const char* fragment_path);
 void lum_shader_destroy(lum_Shader* shader);
 void lum_shader_use(const lum_Shader* shader);
 

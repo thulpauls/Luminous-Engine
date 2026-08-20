@@ -3,9 +3,10 @@
 #include "lum_input.h"
 #include "lum_time.h"
 #include "lum_renderer2d.h"
+#include "effects/lum_glow.h"
 #include <string.h>
 #include <stdbool.h>
-#include <assert.h>
+#include "lum_assert.h"
 
 typedef struct lum_Application {
     bool running;
@@ -44,12 +45,19 @@ static int lum_app_init_subsystems(const lum_App_desc* desc) {
     lum_renderer2d_set_clear_color(desc->clear_color);
     lum_renderer2d_enable_blend();
 
+    if (!lum_glow_init()) {
+        Lum_Log_Fatal("app: glow init failed.");
+        goto failure_glow;
+    }
+
     lum_camera2d_init(&g_application.camera, (float)desc->width, (float)desc->height);
 
     g_application.last_framebuffer_w = lum_window_get_framebuffer_width();
     g_application.last_framebuffer_h = lum_window_get_framebuffer_height();
     return 1;
 
+failure_glow:
+    lum_renderer2d_shutdown();
 failure_renderer2d:
     lum_time_shutdown();
 failure_time:
@@ -62,6 +70,7 @@ failure_window:
 }
 
 static void lum_app_shutdown_subsystems(void) {
+    lum_glow_shutdown();
     lum_renderer2d_shutdown();
     lum_time_shutdown();
     lum_input_shutdown();
@@ -101,7 +110,7 @@ int lum_app_init_desc(lum_App_desc* desc, void (*on_start)(void), void (*on_upda
 }
 
 int lum_app_run(const lum_App_desc* desc) {
-    assert(desc);
+    Lum_Assert(desc);
     if (!desc->initialized) return 0;
 
     lum_App_desc d = *desc;
@@ -157,6 +166,7 @@ lum_Vec2 lum_app_screen_to_world(lum_Vec2 screen) {
   return lum_camera2d_screen_to_world(&g_application.camera, screen, 
     lum_vec2_create((float)lum_window_get_width(), (float)lum_window_get_height()));
 }
+
 lum_Vec2 lum_app_world_to_screen(lum_Vec2 world) {
   return lum_camera2d_world_to_screen(&g_application.camera, world, 
     lum_vec2_create((float)lum_window_get_width(), (float)lum_window_get_height()));

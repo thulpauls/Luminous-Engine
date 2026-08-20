@@ -2,6 +2,7 @@
 #include "lum_texture.h"
 #include "lum_filesystem.h"
 #include "lum_log.h"
+#include "lum_assert.h"
 #include "lum_math2d.h"
 #include "lum_renderer2d.h"
 #include <stb_image.h>
@@ -92,7 +93,7 @@ void lum_tr_destroy_font(lum_Font* font) {
 }
 
 static int lum_tr_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
-  assert(codepoint < 128);
+  Lum_Assert(codepoint < 128);
 
   lum_Glyph* glyph = &tr->glyphs[codepoint];
   if(glyph->loaded) return 1;
@@ -149,7 +150,7 @@ static int lum_tr_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
 }
 
 void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int32_t layer, lum_Vec4 color) {
-  assert(font && text);
+  Lum_Assert(font && text);
   if (!font->initialized) return;
   lum_Text_renderer* tr = (lum_Text_renderer*)font->renderer;
 
@@ -159,7 +160,7 @@ void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int3
 
   for(const char* p = text; *p; ++p) {
     unsigned char c = (unsigned char)(*p);
-    assert(c < 128);
+    Lum_Assert(c < 128);
 
     if (c == '\n') {
       pen_x = x;
