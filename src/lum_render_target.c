@@ -16,15 +16,10 @@ static void lum__rt_release_gl(lum_Render_target* rt) {
 }
 
 static int lum__rt_build(lum_Render_target* rt, int width, int height, bool depth) {
-    if (!lum_texture2d_create(&rt->color, width, height, 4, NULL)) {
+    if (!lum_texture2d_create(&rt->color, width, height, 4, NULL, Lum_Texture_Flag_Filter_Linear)) {
         Lum_Log_Error("render_target: failed to create color texture.");
         return 0;
     }
-
-    glBindTexture(GL_TEXTURE_2D, rt->color.id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
 
     glGenFramebuffers(1, &rt->FBO);
     if (!rt->FBO) {

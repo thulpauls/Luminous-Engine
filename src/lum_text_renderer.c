@@ -1,21 +1,25 @@
 #include "lum_text_renderer.h"
 #include "lum_texture.h"
+#include "lum_atlas.h"
 #include "lum_filesystem.h"
 #include "lum_log.h"
 #include "lum_assert.h"
 #include "lum_math2d.h"
 #include "lum_renderer2d.h"
-#include <stb_image.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 #include <string.h>
-#include <glad/glad.h>
+#include <stdlib.h>
+
+#define Lum_Text_Atlas_Size    512   /* R8 单页 256KB；ASCII 128 字形按 24px 算只用约 1/3 */
+#define Lum_Text_Atlas_Padding 1
 
 typedef struct lum_Glyph {
-  lum_Texture2d texture;
+  lum_Vec4 uv;          /* atlas 内归一化 UV 矩形（已含半 texel 内缩） */
   int width, height;
   int bearingX, bearingY;
   int advance;
+  int index;            /* 缓存的 stbtt glyph index，kerning 免每帧 FindGlyphIndex */
   bool loaded;
 } lum_Glyph;
 
@@ -26,6 +30,9 @@ typedef struct lum_Text_renderer {
   float scale;
   int ascent, descent;
   int line_gap;
+
+  lum_Texture2d atlas_tex;   /* 整个字体共享一张：R8 + LINEAR + swizzle + 清零 */
+  lum_Atlas atlas;           /* 槽位账本，尺寸与 atlas_tex 一致 */
 
   lum_Glyph glyphs[128];
 } lum_Text_renderer;
@@ -40,7 +47,7 @@ static void lum_text_renderer_reset(lum_Text_renderer* tr) {
 
 static int lum_tr_initialize_renderer(lum_Text_renderer* tr, const char* font, float height_pixel) {
   lum_text_renderer_reset(tr);
-    
+
   tr->font_buffer = lum_fs_read_binary(font).data;
   if (!tr->font_buffer) return 0;
 
@@ -48,6 +55,21 @@ static int lum_tr_initialize_renderer(lum_Text_renderer* tr, const char* font, f
     free(tr->font_buffer);
     tr->font_buffer = NULL;
     Lum_Log_Error("Failed to initialize stb_tt font: %s", font);
+    return 0;
+  }
+
+  if (!lum_texture2d_create(&tr->atlas_tex, Lum_Text_Atlas_Size, Lum_Text_Atlas_Size, 1, NULL,
+                            Lum_Texture_Flag_Clear | Lum_Texture_Flag_Filter_Linear
+                            | Lum_Texture_Flag_Swizzle_R_To_RGBA)) {
+    free(tr->font_buffer);
+    tr->font_buffer = NULL;
+    Lum_Log_Error("text: failed to create glyph atlas.");
+    return 0;
+  }
+  if (!lum_atlas_init(&tr->atlas, Lum_Text_Atlas_Size, Lum_Text_Atlas_Size, Lum_Text_Atlas_Padding)) {
+    lum_texture2d_destroy(&tr->atlas_tex);
+    free(tr->font_buffer);
+    tr->font_buffer = NULL;
     return 0;
   }
 
@@ -59,11 +81,8 @@ static int lum_tr_initialize_renderer(lum_Text_renderer* tr, const char* font, f
 static void lum_tr_destroy_renderer(lum_Text_renderer* tr) {
   if (!tr) return;
 
-  for (size_t i = 0; i < 128; ++i) {
-    if (tr->glyphs[i].texture.initialized) {
-      lum_texture2d_destroy(&tr->glyphs[i].texture);
-    }
-  }
+  lum_texture2d_destroy(&tr->atlas_tex);
+  lum_atlas_shutdown(&tr->atlas);
 
   if (tr->font_buffer) {
     free(tr->font_buffer);
@@ -96,7 +115,7 @@ static int lum_tr_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
   Lum_Assert(codepoint < 128);
 
   lum_Glyph* glyph = &tr->glyphs[codepoint];
-  if(glyph->loaded) return 1;
+  if (glyph->loaded) return 1;
 
   int glyph_index = stbtt_FindGlyphIndex(&tr->font, codepoint);
 
@@ -113,6 +132,7 @@ static int lum_tr_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
 
     stbtt_MakeGlyphBitmap(&tr->font, bitmap, w, h, w, tr->scale, tr->scale, glyph_index);
 
+    /* stbtt 输出顶朝下行序，翻成 GL 的底朝向，pixel_rect_to_uv 才能直接使用 */
     for (int row = 0; row < h / 2; ++row) {
       unsigned char* top_row = bitmap + (size_t)row * w;
       unsigned char* bot_row = bitmap + (size_t)(h - 1 - row) * w;
@@ -125,25 +145,34 @@ static int lum_tr_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
   }
 
   if (bitmap) {
-    if (!lum_texture2d_create(&glyph->texture, w, h, 1, bitmap)) {
+    lum_Atlas_slot slot;
+    if (!lum_atlas_alloc(&tr->atlas, w, h, &slot)) {
       free(bitmap);
+      Lum_Log_Warn("text: atlas page full, glyph %u dropped.", codepoint);
       return 0;
     }
+
+    lum_texture2d_update_region(&tr->atlas_tex, slot.x, slot.y, w, h, bitmap);
     free(bitmap);
 
-    glBindTexture(GL_TEXTURE_2D, glyph->texture.id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    lum_Vec4 uv = lum_texture2d_pixel_rect_to_uv(&tr->atlas_tex, slot.x, slot.y, w, h);
+    /* 半 texel 内缩：采样落在边缘 texel 中心，LINEAR 下字形边缘更实；
+       w/h <= 1 不缩，避免 UV 区间退化成零宽 */
+    if (w > 1 && h > 1) {
+      float hu = 0.5f / (float)tr->atlas_tex.width;
+      float hv = 0.5f / (float)tr->atlas_tex.height;
+      uv = lum_vec4_create(uv.x + hu, uv.y + hv, uv.z - hu, uv.w - hv);
+    }
+    glyph->uv = uv;
   }
+  /* 空 bitmap（空格等）：不占槽位，只存度量 */
 
   glyph->width = w;
   glyph->height = h;
   glyph->bearingX = x0;
   glyph->bearingY = y0;
   glyph->advance = advance_w;
+  glyph->index = glyph_index;
   glyph->loaded = true;
 
   return 1;
@@ -157,14 +186,15 @@ void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int3
   float x = position.x, y = position.y;
   float pen_x = x;
   float baseline = y;
+  float line_step = (float)(tr->ascent - tr->descent + tr->line_gap) * tr->scale;
 
-  for(const char* p = text; *p; ++p) {
+  for (const char* p = text; *p; ++p) {
     unsigned char c = (unsigned char)(*p);
     Lum_Assert(c < 128);
 
     if (c == '\n') {
       pen_x = x;
-      baseline -= (float)(tr->ascent - tr->descent + tr->line_gap) * tr->scale;
+      baseline -= line_step;
       continue;
     }
 
@@ -178,14 +208,16 @@ void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int3
       float w = (float)glyph->width;
       float h = (float)glyph->height;
 
-      lum_renderer2d_draw_sprite_ex_layer(&glyph->texture, lum_vec2_create(xpos, ypos), lum_vec2_create(w, h), 0.0f, lum_vec2_0(), layer, color);
+      lum_renderer2d_draw_sprite_uv_layer(&tr->atlas_tex, lum_vec2_create(xpos, ypos),
+                                          lum_vec2_create(w, h), glyph->uv, layer, color);
     }
 
     int kerning = 0;
     if (*(p + 1)) {
-      int glyph1 = stbtt_FindGlyphIndex(&tr->font, c);
-      int glyph2 = stbtt_FindGlyphIndex(&tr->font, (unsigned char)*(p + 1));
-      kerning = stbtt_GetGlyphKernAdvance(&tr->font, glyph1, glyph2);
+      unsigned char nc = (unsigned char)*(p + 1);
+      int gi2 = tr->glyphs[nc].loaded ? tr->glyphs[nc].index
+                                      : stbtt_FindGlyphIndex(&tr->font, nc);
+      kerning = stbtt_GetGlyphKernAdvance(&tr->font, glyph->index, gi2);
     }
     pen_x += (float)(glyph->advance + kerning) * tr->scale;
   }
@@ -193,4 +225,46 @@ void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int3
 
 void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 color) {
     lum_tr_draw_layer(font, text, position, 0, color);
+}
+
+lum_Vec2 lum_tr_measure_text(lum_Font* font, const char* text) {
+  lum_Vec2 size = lum_vec2_create(0.0f, 0.0f);
+  Lum_Assert(font && text);
+  if (!font->initialized || !text[0]) return size;
+
+  lum_Text_renderer* tr = (lum_Text_renderer*)font->renderer;
+  float line_step = (float)(tr->ascent - tr->descent + tr->line_gap) * tr->scale;
+  float pen_x = 0.0f;
+  float max_x = 0.0f;
+  int lines = 1;
+
+  for (const char* p = text; *p; ++p) {
+    unsigned char c = (unsigned char)(*p);
+    Lum_Assert(c < 128);
+
+    if (c == '\n') {
+      if (pen_x > max_x) max_x = pen_x;
+      pen_x = 0.0f;
+      ++lines;
+      continue;
+    }
+
+    if (!lum_tr_load_glyph(tr, c)) continue;
+
+    lum_Glyph* glyph = &tr->glyphs[c];
+
+    int kerning = 0;
+    if (*(p + 1)) {
+      unsigned char nc = (unsigned char)*(p + 1);
+      int gi2 = tr->glyphs[nc].loaded ? tr->glyphs[nc].index
+                                      : stbtt_FindGlyphIndex(&tr->font, nc);
+      kerning = stbtt_GetGlyphKernAdvance(&tr->font, glyph->index, gi2);
+    }
+    pen_x += (float)(glyph->advance + kerning) * tr->scale;
+  }
+  if (pen_x > max_x) max_x = pen_x;
+
+  size.x = max_x;
+  size.y = (float)lines * line_step;
+  return size;
 }

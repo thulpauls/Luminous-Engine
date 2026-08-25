@@ -55,6 +55,7 @@ void lum_renderer2d_disable_blend(void);
 void lum_renderer2d_create_vertex(lum_Vertex* vertex, lum_Vec3 position, lum_Vec2 uv, lum_Vec4 color);
 
 void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]);
+void lum_build_quad_uv(lum_Mat4 model, lum_Vec4 uv_rect, lum_Vec4 color, lum_Vertex out_verts[4]);
 
 void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count, const uint32_t* indices, uint32_t index_count, lum_Primitive primitive, const lum_Material* material, const lum_Texture2d* texture, int32_t layer);
 void lum_renderer2d_draw_fullscreen(const lum_Material* material, const lum_Texture2d* src, int32_t layer);
@@ -63,6 +64,8 @@ void lum_renderer2d_draw_sprite_layer(const lum_Texture2d* texture, const lum_Tr
 void lum_renderer2d_draw_rect_layer(const lum_Transform2d* transform, int32_t layer, lum_Vec4 color);
 
 void lum_renderer2d_draw_sprite_ex_layer(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color);
+void lum_renderer2d_draw_sprite_uv_layer(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, lum_Vec4 uv_rect, int32_t layer, lum_Vec4 color);
+
 void lum_renderer2d_draw_rect_ex_layer(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color);
 
 void lum_renderer2d_draw_line(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Vec4 color);

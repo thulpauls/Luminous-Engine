@@ -19,4 +19,10 @@ void lum_tr_destroy_font(lum_Font* font);
 void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int32_t layer, lum_Vec4 color);
 void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 color);
 
+/*
+* @brief 测量文本包围尺寸，返回 (宽, 高)；多行取最大宽 × 行数。
+*        会触发未加载字形的懒加载
+*/
+lum_Vec2 lum_tr_measure_text(lum_Font* font, const char* text);
+
 #endif //Lum_Text_Renderer_H

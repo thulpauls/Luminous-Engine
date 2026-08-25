@@ -29,6 +29,7 @@
 /* --- 渲染层 --- */
 #include "lum_shader.h"
 #include "lum_texture.h"
+#include "lum_atlas.h"
 #include "lum_camera.h"
 #include "lum_transform.h"
 #include "lum_renderer2d.h"
@@ -36,7 +37,7 @@
 #include "lum_render_target.h"
 
 /* --- 特效 --- */
-#include "effects/lum_glow.h"
+#include "effects/lum_effects.h"
 
 /* --- 子系统 --- */
 #include "lum_text_renderer.h"

@@ -5,60 +5,149 @@
 #include <stb_image.h>
 #include "lum_assert.h"
 #include <string.h>
+#include <stdlib.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-uint32_t lum_texture_create_2d_with_options(const unsigned char* pixels, int wrap_s, int wrap_t, int min_filter, int max_filter, int width, int height, uint32_t channels) {
-  /* pixels 可为 NULL：glTexImage2D 只分配存储不上传（用于 FBO color 附件等）。 */
-  GLuint texture;
-  glGenTextures(1, &texture);
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, texture);
+static GLenum lum_texture_pixel_format(uint32_t channels) {
+  switch (channels) {
+    case 1: return GL_RED;
+    case 3: return GL_RGB;
+    case 4: return GL_RGBA;
+    default: return 0;
+  }
+}
 
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, max_filter);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+/* 显式 sized internal format：unsized 格式由驱动自选，GL_R8 是 glyph atlas 的前提 */
+static GLenum lum_texture_internal_format(uint32_t channels) {
+  switch (channels) {
+    case 1: return GL_R8;
+    case 3: return GL_RGB8;
+    case 4: return GL_RGBA8;
+    default: return 0;
+  }
+}
 
-  if (channels == 1 || channels == 3 || channels == 4) {
-    GLenum format = channels == 1 ? GL_RED : channels == 3 ? GL_RGB : GL_RGBA;
-    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, pixels);
-    glGenerateMipmap(GL_TEXTURE_2D);
-  } else {
-    glDeleteTextures(1, &texture);
-    Lum_Log_Error("Failed to load texture.");
-    
+int lum_texture2d_create(lum_Texture2d* texture, int width, int height, uint32_t channels,
+                         const unsigned char* pixels, uint32_t flags) {
+  Lum_Assert(texture);
+  memset(texture, 0, sizeof(*texture));
+
+  if (width <= 0 || height <= 0) {
+    Lum_Log_Error("Failed to create texture: invalid size %dx%d.", width, height);
     return 0;
   }
-  
-  return texture;
-}
 
-uint32_t lum_texture_create_2d(const unsigned char* pixels, int width, int height, uint32_t channels) {
-  return lum_texture_create_2d_with_options(pixels, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_NEAREST, width, height, channels);
-}
+  GLenum internal = lum_texture_internal_format(channels);
+  GLenum format = lum_texture_pixel_format(channels);
+  if (!internal || !format) {
+    Lum_Log_Error("texture: failed to create texture: unsupported channels %u.", channels);
+    return 0;
+  }
 
-int lum_texture2d_create(lum_Texture2d* texture, int width, int height, uint32_t channels, const unsigned char* pixels) {
-  Lum_Assert(texture);
+  if ((flags & Lum_Texture_Flag_Clear) && pixels) {
+    Lum_Log_Error("texture: failed to create texture: Flag_Clear requires pixels == NULL.");
+    return 0;
+  }
+  if ((flags & Lum_Texture_Flag_Swizzle_R_To_RGBA) && channels != 1) {
+    Lum_Log_Error("texture: failed to create texture: Flag_Swizzle_R_To_RGBA requires channels == 1.");
+    return 0;
+  }
 
-  uint32_t id = lum_texture_create_2d(pixels, width, height, channels);
+  GLuint id;
+  glGenTextures(1, &id);
   if (!id) return 0;
+
+  bool linear = (flags & Lum_Texture_Flag_Filter_Linear) != 0;
+  bool mipmaps = (flags & Lum_Texture_Flag_Mipmaps) != 0;
+  GLenum wrap = (flags & Lum_Texture_Flag_Wrap_Repeat) ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+  GLenum min_filter = linear ? (mipmaps ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR) : GL_NEAREST;
+  GLenum mag_filter = linear ? GL_LINEAR : GL_NEAREST;
+
+  unsigned char* zeros = NULL;
+  const unsigned char* upload = pixels;
+  if (flags & Lum_Texture_Flag_Clear) {
+    zeros = (unsigned char*)calloc((size_t)width * (size_t)height * (size_t)channels, 1);
+    if (!zeros) {
+      glDeleteTextures(1, &id);
+      Lum_Log_Error("texture: failed to create texture: clear buffer alloc failed (%dx%dx%u).", width, height, channels);
+      return 0;
+    }
+    upload = zeros;
+  }
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, id);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, internal, width, height, 0, format, GL_UNSIGNED_BYTE, upload);
+  free(zeros);
+
+  if (mipmaps) {
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
+
+  /* 单通道 swizzle 成 (r,r,r,r)：让 sprite shader 的 texture()*vColor 染色路径直接可用 */
+  if (flags & Lum_Texture_Flag_Swizzle_R_To_RGBA) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED);
+  }
+
   texture->id = id;
   texture->width = width;
   texture->height = height;
   texture->channels = channels;
+  texture->mipmaps = mipmaps;
   texture->initialized = true;
+  return 1;
+}
+
+int lum_texture2d_update_region(lum_Texture2d* texture, int x, int y, int w, int h, const unsigned char* pixels) {
+  Lum_Assert(texture);
+  if (!texture->initialized) return 0;
+  if (!pixels || w <= 0 || h <= 0) return 0;
+  if (x < 0 || y < 0 || x + w > texture->width || y + h > texture->height) {
+    Lum_Log_Warn("texture region [%d, %d, %dx%d] out of bounds (texture %dx%d).",
+                 x, y, w, h, texture->width, texture->height);
+    return 0;
+  }
+
+  GLenum format = lum_texture_pixel_format(texture->channels);
+
+  glBindTexture(GL_TEXTURE_2D, texture->id);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, format, GL_UNSIGNED_BYTE, pixels);
+  if (texture->mipmaps) {
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
+  glBindTexture(GL_TEXTURE_2D, 0);
 
   return 1;
 }
 
-int lum_texture2d_create_white(lum_Texture2d* texture) {
-  static const unsigned char white_pixel[4] = {255, 255, 255, 255};
-  return lum_texture2d_create(texture, 1, 1, 4, white_pixel);
+lum_Vec4 lum_texture2d_pixel_rect_to_uv(const lum_Texture2d* texture, int x, int y, int w, int h) {
+  Lum_Assert(texture);
+  if (!texture->initialized) return lum_vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
+
+  float iw = 1.0f / (float)texture->width;
+  float ih = 1.0f / (float)texture->height;
+  return lum_vec4_create((float)x * iw, (float)y * ih,
+                         (float)(x + w) * iw, (float)(y + h) * ih);
 }
 
-int lum_texture2d_load_from_file(lum_Texture2d* texture, const char* path, uint32_t desired_channels) {
+int lum_texture2d_create_white(lum_Texture2d* texture) {
+  static const unsigned char white_pixel[4] = {255, 255, 255, 255};
+  return lum_texture2d_create(texture, 1, 1, 4, white_pixel, Lum_Texture_Flag_None);
+}
+
+int lum_texture2d_load_from_file(lum_Texture2d* texture, const char* path, uint32_t desired_channels, uint32_t flags) {
   Lum_Assert(path);
 
   int width, height, channels;
@@ -67,7 +156,7 @@ int lum_texture2d_load_from_file(lum_Texture2d* texture, const char* path, uint3
   if (!pixels) return 0;
 
   int upload_channels = desired_channels ? desired_channels : channels;
-  int success = lum_texture2d_create(texture, width, height, upload_channels, pixels);
+  int success = lum_texture2d_create(texture, width, height, upload_channels, pixels, flags);
   stbi_image_free(pixels);
 
   return success;

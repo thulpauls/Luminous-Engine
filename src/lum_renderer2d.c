@@ -500,9 +500,14 @@ void lum_renderer2d_create_vertex(lum_Vertex* vertex, lum_Vec3 position, lum_Vec
   vertex->color[3] = color.w;
 }
 
-void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]) {
+void lum_build_quad_uv(lum_Mat4 model, lum_Vec4 uv_rect, lum_Vec4 color, lum_Vertex out_verts[4]) {
   static const lum_Vec2 local[4] = { {0.0f,0.0f}, {1.0f,0.0f}, {1.0f,1.0f}, {0.0f,1.0f} };
-  static const lum_Vec2 uv[4] = { {0.0f,0.0f}, {1.0f,0.0f}, {1.0f,1.0f}, {0.0f,1.0f} };
+  const lum_Vec2 uv[4] = {
+    { uv_rect.x, uv_rect.y },
+    { uv_rect.z, uv_rect.y },
+    { uv_rect.z, uv_rect.w },
+    { uv_rect.x, uv_rect.w },
+  };
 
   for (int i = 0; i < 4; ++i) {
     lum_Vec4 p = lum_mat4_mul_vec4(model, lum_vec4_create(local[i].x, local[i].y, 0.0f, 1.0f));
@@ -512,6 +517,10 @@ void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]) {
     out_verts[i].color[0] = color.x; out_verts[i].color[1] = color.y;
     out_verts[i].color[2] = color.z; out_verts[i].color[3] = color.w;
   }
+}
+
+void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]) {
+  lum_build_quad_uv(model, lum_vec4_create(0.0f, 0.0f, 1.0f, 1.0f), color, out_verts);
 }
 
 void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count, const uint32_t* indices, uint32_t index_count, lum_Primitive primitive, const lum_Material* material, const lum_Texture2d* texture, int32_t layer) {
@@ -604,6 +613,19 @@ void lum_renderer2d_draw_sprite_ex_layer(const lum_Texture2d* texture, lum_Vec2 
 
   lum_Transform2d t = lum_transform2d_create(position, size, lum_vec2_1(), rotation_rad, origin);
   lum_renderer2d_draw_sprite_layer(texture, &t, layer, color);
+}
+
+void lum_renderer2d_draw_sprite_uv_layer(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, lum_Vec4 uv_rect, int32_t layer, lum_Vec4 color) {
+  static const uint32_t lum_quad_indices[6] = { 0, 1, 2, 2, 3, 0 };
+
+  Lum_Assert(texture);
+  if (!g_renderer2d.initialized) return;
+
+  lum_Transform2d t = lum_transform2d_create(position, size, lum_vec2_1(), 0.0f, lum_vec2_0());
+  lum_Mat4 model = lum_transform2d_get_matrix(&t);
+  lum_Vertex v[4];
+  lum_build_quad_uv(model, uv_rect, color, v);
+  lum_renderer2d_draw_mesh(v, 4, lum_quad_indices, 6, Lum_Primitive_Triangles, &g_renderer2d.sprite_material, texture, layer);
 }
 
 void lum_renderer2d_draw_rect_ex_layer(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color) {

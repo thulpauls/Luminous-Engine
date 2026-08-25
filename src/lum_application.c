@@ -3,7 +3,7 @@
 #include "lum_input.h"
 #include "lum_time.h"
 #include "lum_renderer2d.h"
-#include "effects/lum_glow.h"
+#include "effects/lum_effects.h"
 #include <string.h>
 #include <stdbool.h>
 #include "lum_assert.h"
@@ -45,9 +45,9 @@ static int lum_app_init_subsystems(const lum_App_desc* desc) {
     lum_renderer2d_set_clear_color(desc->clear_color);
     lum_renderer2d_enable_blend();
 
-    if (!lum_glow_init()) {
-        Lum_Log_Fatal("app: glow init failed.");
-        goto failure_glow;
+    if (!lum_effects_init()) {
+        Lum_Log_Fatal("app: effects init failed.");
+        goto failure_effects;
     }
 
     lum_camera2d_init(&g_application.camera, (float)desc->width, (float)desc->height);
@@ -56,7 +56,7 @@ static int lum_app_init_subsystems(const lum_App_desc* desc) {
     g_application.last_framebuffer_h = lum_window_get_framebuffer_height();
     return 1;
 
-failure_glow:
+failure_effects:
     lum_renderer2d_shutdown();
 failure_renderer2d:
     lum_time_shutdown();
@@ -70,7 +70,7 @@ failure_window:
 }
 
 static void lum_app_shutdown_subsystems(void) {
-    lum_glow_shutdown();
+    lum_effects_shutdown();
     lum_renderer2d_shutdown();
     lum_time_shutdown();
     lum_input_shutdown();

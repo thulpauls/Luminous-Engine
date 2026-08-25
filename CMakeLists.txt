@@ -26,14 +26,7 @@ file(GLOB_RECURSE LUM_ENGINE_SOURCES CONFIGURE_DEPENDS src/*.c)
 
 add_library(Luminous STATIC ${LUM_ENGINE_SOURCES} glad.c)
 
-add_executable(Luminous_example example.c)
-target_link_libraries(Luminous_example Luminous glfw)
-
-add_executable(Luminous_playground playground/playground.c)
-target_link_libraries(Luminous_playground Luminous glfw)
-
 add_executable(Luminous_glow_demo glow_demo.c)
 target_link_libraries(Luminous_glow_demo Luminous glfw)
 
 file(COPY resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(COPY playground/resources DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/playground")
