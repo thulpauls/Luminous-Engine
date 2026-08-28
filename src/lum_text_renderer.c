@@ -223,6 +223,14 @@ void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int3
   }
 }
 
+void lum_tr_preload_ascii(lum_Font* font) {
+  if (!font->initialized) return;
+  lum_Text_renderer* tr = (lum_Text_renderer*)font->renderer;
+  for (unsigned int c = 32; c < 127; ++c) {
+    lum__tr_load_glyph(tr, c);
+  }
+}
+
 void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 color) {
     lum_tr_draw_layer(font, text, position, 0, color);
 }

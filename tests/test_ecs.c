@@ -176,12 +176,58 @@ static void test_name_type(void) {
   lum_ecs_destroy(ecs);
 }
 
+/* 回归：池大小不等时，each 出参必须严格按 view_create2/3 的参数顺序（曾经按排序后
+   池序赋值导致组件互换——场景渲染崩溃的根因） */
+static void test_view_out_param_order(void) {
+  lum_Ecs* ecs = lum_ecs_create();
+  lum_Component_type small_id = lum_ecs_register_component(ecs, "small", sizeof(double));
+  lum_Component_type big_id   = lum_ecs_register_component(ecs, "big",   sizeof(double));
+
+  /* 制造不对称：big 5 个，small 2 个 → 排序后 small 是主池 */
+  for (int i = 0; i < 5; ++i) {
+    lum_Entity e = lum_ecs_create_entity(ecs);
+    *(double*)lum_ecs_add(ecs, e, big_id) = 100.0 + i;
+    if (i < 2) *(double*)lum_ecs_add(ecs, e, small_id) = 200.0 + i;
+  }
+
+  /* 参数顺序 small 在前：out_a 必须是 small 值域 */
+  lum_Ecs_view v = lum_ecs_view_create2(ecs, small_id, big_id);
+  double* s; double* b; lum_Entity e;
+  int n = 0;
+  while ((e = lum_ecs_view_each2(&v, (void**)&s, (void**)&b)) != Lum_Entity_Null) {
+    CHECK(*s >= 200.0 && *s < 202.0);      /* out_a = small */
+    CHECK(*b >= 100.0 && *b < 105.0);      /* out_b = big */
+    ++n;
+  }
+  CHECK(n == 2);
+
+  /* 参数顺序反过来：out_a/b 跟着参数走，不跟池大小走 */
+  v = lum_ecs_view_create2(ecs, big_id, small_id);
+  n = 0;
+  while ((e = lum_ecs_view_each2(&v, (void**)&b, (void**)&s)) != Lum_Entity_Null) {
+    CHECK(*s >= 200.0 && *s < 202.0);
+    CHECK(*b >= 100.0 && *b < 105.0);
+    ++n;
+  }
+  CHECK(n == 2);
+
+  /* 与 lum_ecs_get 的指针逐实体一致（类型不混的强断言） */
+  v = lum_ecs_view_create2(ecs, small_id, big_id);
+  while ((e = lum_ecs_view_each2(&v, (void**)&s, (void**)&b)) != Lum_Entity_Null) {
+    CHECK((const void*)s == lum_ecs_get(ecs, e, small_id));
+    CHECK((const void*)b == lum_ecs_get(ecs, e, big_id));
+  }
+
+  lum_ecs_destroy(ecs);
+}
+
 int main(void) {
   test_basic();
   test_generation();
   test_views();
   test_stress();
   test_name_type();
+  test_view_out_param_order();
   printf("lum_ecs tests: %d passed, %d failed\n", g_pass, g_fail);
   return g_fail ? 1 : 0;
 }

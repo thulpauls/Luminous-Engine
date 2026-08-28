@@ -378,21 +378,21 @@ static bool lum__ecs_view_init(lum_Ecs* ecs, lum_Ecs_view* v, int n, const lum_C
   v->ecs = ecs;
   v->i = 0;
   v->n = 0;
+  v->primary = 0;
   for (int k = 0; k < n; ++k) {
     if (types[k] >= lum_vector_size(&ecs->pools)) {
       Lum_Log_Error("ecs: view with unregistered component type %u.", types[k]);
       return false;
     }
   }
+  /* 池保持调用者的参数顺序——each 出参按参数位置赋值，绝不能重排；
+     元素最少的池只记下标做主迭代（性能），不改变顺序 */
   for (int k = 0; k < n; ++k) {
     v->pools[k] = (const lum_Pool*)lum_vector_get_const(&ecs->pools, types[k]);
   }
-  /* 按 dense 元素数升序，最小的做主迭代池 */
   for (int k = 1; k < n; ++k) {
-    for (int j = k; j > 0 && v->pools[j - 1]->entities.size > v->pools[j]->entities.size; --j) {
-      const lum_Pool* tmp = v->pools[j];
-      v->pools[j] = v->pools[j - 1];
-      v->pools[j - 1] = tmp;
+    if (v->pools[k]->entities.size < v->pools[v->primary]->entities.size) {
+      v->primary = (uint32_t)k;
     }
   }
   v->n = n;
@@ -436,16 +436,25 @@ lum_Entity lum_ecs_view_each(lum_Ecs_view* v, void** out_a) {
 lum_Entity lum_ecs_view_each2(lum_Ecs_view* v, void** out_a, void** out_b) {
   Lum_Assert(v && out_a && out_b);
   if (v->n < 2) return Lum_Entity_Null;
-  const lum_Pool* p0 = v->pools[0];
-  const lum_Pool* p1 = v->pools[1];
-  while (v->i < lum_vector_size((lum_Vector*)&p0->entities)) {
-    lum_Entity e = lum__pool_entities(p0)[v->i];
-    uint32_t pos0 = v->i++;
+  const lum_Pool* pa = v->pools[0];   /* 参数 a 的池 */
+  const lum_Pool* pb = v->pools[1];   /* 参数 b 的池 */
+  const lum_Pool* main_p = v->pools[v->primary];
+  const lum_Pool* other_p = (v->primary == 0) ? pb : pa;
+  while (v->i < lum_vector_size((lum_Vector*)&main_p->entities)) {
+    lum_Entity e = lum__pool_entities(main_p)[v->i];
+    uint32_t main_pos = v->i++;
     if (!lum_ecs_alive(v->ecs, e)) continue;
-    uint32_t pos1 = lum__pool_sparse(p1)[lum__entity_index(e)];
-    if (pos1 == Lum_Pool_Sparse_None) continue;
-    *out_a = lum__pool_components(p0) + (size_t)pos0 * p0->size;
-    *out_b = lum__pool_components(p1) + (size_t)pos1 * p1->size;
+    uint32_t other_pos = lum__pool_sparse(other_p)[lum__entity_index(e)];
+    if (other_pos == Lum_Pool_Sparse_None) continue;
+    void* main_comp = lum__pool_components(main_p) + (size_t)main_pos * main_p->size;
+    void* other_comp = lum__pool_components(other_p) + (size_t)other_pos * other_p->size;
+    if (v->primary == 0) {
+      *out_a = main_comp;
+      *out_b = other_comp;
+    } else {
+      *out_a = other_comp;
+      *out_b = main_comp;
+    }
     return e;
   }
   return Lum_Entity_Null;
@@ -454,20 +463,24 @@ lum_Entity lum_ecs_view_each2(lum_Ecs_view* v, void** out_a, void** out_b) {
 lum_Entity lum_ecs_view_each3(lum_Ecs_view* v, void** out_a, void** out_b, void** out_c) {
   Lum_Assert(v && out_a && out_b && out_c);
   if (v->n < 3) return Lum_Entity_Null;
-  const lum_Pool* p0 = v->pools[0];
-  const lum_Pool* p1 = v->pools[1];
-  const lum_Pool* p2 = v->pools[2];
-  while (v->i < lum_vector_size((lum_Vector*)&p0->entities)) {
-    lum_Entity e = lum__pool_entities(p0)[v->i];
-    uint32_t pos0 = v->i++;
+  const lum_Pool* pa = v->pools[0];
+  const lum_Pool* pb = v->pools[1];
+  const lum_Pool* pc = v->pools[2];
+  const lum_Pool* main_p = v->pools[v->primary];
+  while (v->i < lum_vector_size((lum_Vector*)&main_p->entities)) {
+    lum_Entity e = lum__pool_entities(main_p)[v->i];
+    uint32_t main_pos = v->i++;
     if (!lum_ecs_alive(v->ecs, e)) continue;
-    uint32_t pos1 = lum__pool_sparse(p1)[lum__entity_index(e)];
-    if (pos1 == Lum_Pool_Sparse_None) continue;
-    uint32_t pos2 = lum__pool_sparse(p2)[lum__entity_index(e)];
-    if (pos2 == Lum_Pool_Sparse_None) continue;
-    *out_a = lum__pool_components(p0) + (size_t)pos0 * p0->size;
-    *out_b = lum__pool_components(p1) + (size_t)pos1 * p1->size;
-    *out_c = lum__pool_components(p2) + (size_t)pos2 * p2->size;
+    uint32_t index = lum__entity_index(e);
+    uint32_t pos_a = lum__pool_sparse(pa)[index];
+    if (pos_a == Lum_Pool_Sparse_None) continue;
+    uint32_t pos_b = lum__pool_sparse(pb)[index];
+    if (pos_b == Lum_Pool_Sparse_None) continue;
+    uint32_t pos_c = lum__pool_sparse(pc)[index];
+    if (pos_c == Lum_Pool_Sparse_None) continue;
+    out_a[0] = lum__pool_components(pa) + (size_t)pos_a * pa->size;
+    out_b[0] = lum__pool_components(pb) + (size_t)pos_b * pb->size;
+    out_c[0] = lum__pool_components(pc) + (size_t)pos_c * pc->size;
     return e;
   }
   return Lum_Entity_Null;

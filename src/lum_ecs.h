@@ -60,8 +60,9 @@ void  lum_ecs_remove(lum_Ecs* ecs, lum_Entity e, lum_Component_type t);
 
 typedef struct lum_Ecs_view {
   lum_Ecs* ecs;
-  const struct lum_Pool* pools[3];
-  int n;
+  const struct lum_Pool* pools[3];   /* 严格保持调用者的参数顺序：each 的出参按此赋值 */
+  int      n;
+  uint32_t primary;                  /* 元素最少的池下标（主迭代，性能优化） */
   uint32_t i;
 } lum_Ecs_view;
 

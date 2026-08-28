@@ -1,43 +1,65 @@
 #include "src/luminous.h"
 #include <math.h>
+#include <string.h>
 
-/* glow_demo —— 演示 lum_glow 程序化光效原语（光晕 + 光圈）。
- * 几个移动的发光点，additive 叠加产生柔和光晕；另有中空亮环（光圈）。
- * lum_glow_init 由 app 主循环自动调用。 */
+/* glow_demo —— 程序化光效演示。
+ * 全部特效均为 ECS 实体：C_glow / C_beam 为 demo 本地组件（带字段表，随 F5/F9 一起存读档），
+ * 由渲染系统注册表驱动绘制；鼠标特效挂在一个跟随光标的隐形实体之下（层级联动）。 */
 
 static lum_Font* g_font;
 static const lum_Texture2d* g_ring;
 
-typedef struct Component_test {
-  int a;
-  int b;
-} Component_test;
+/* ---------- demo 本地组件：光晕 / 光圈 / 光束 ---------- */
 
-static const lum_Component_field_desc component_test_fields[2] = {
-  Lum_Component_Make_Field_I32(Component_test, a, "a", 1),
-  Lum_Component_Make_Field_I32(Component_test, b, "b", 2),
+typedef struct {
+  bool     ring;              /* false = 高斯光晕，true = 中空光环 */
+  float    radius;
+  int32_t  layer;
+  lum_Vec4 color;
+  float    core_size, core_decay, edge_decay, halo_intensity;             /* 光晕参数 */
+  float    ring_radius, ring_width, ring_intensity;                       /* 光环参数 */
+  float    ring_inner_decay, ring_outer_decay;
+} C_glow;
+
+typedef struct {
+  lum_Vec2 start_offset, end_offset;   /* 相对实体 transform.position */
+  float    thickness;
+  int32_t  mode;                        /* lum_Beam_mode */
+  int32_t  layer;
+  lum_Vec4 color;
+  float    core_size, core_decay, edge_decay;
+} C_beam;
+
+static lum_Component_type C_glow_id;
+static lum_Component_type C_beam_id;
+
+static const lum_Component_field_desc g_glow_fields[] = {
+  Lum_Component_Make_Field_Bool(C_glow, ring,              "ring",            false),
+  Lum_Component_Make_Field_F32 (C_glow, radius,            "radius",          60.0f),
+  Lum_Component_Make_Field_I32 (C_glow, layer,             "layer",           0),
+  Lum_Component_Make_Field_Vec4(C_glow, color,             "color",           1, 1, 1, 1),
+  Lum_Component_Make_Field_F32 (C_glow, core_size,         "core_size",       0.18f),
+  Lum_Component_Make_Field_F32 (C_glow, core_decay,        "core_decay",      1.0f),
+  Lum_Component_Make_Field_F32 (C_glow, edge_decay,        "edge_decay",      4.0f),
+  Lum_Component_Make_Field_F32 (C_glow, halo_intensity,    "halo_intensity",  0.35f),
+  Lum_Component_Make_Field_F32 (C_glow, ring_radius,       "ring_radius",     0.6f),
+  Lum_Component_Make_Field_F32 (C_glow, ring_width,        "ring_width",      0.12f),
+  Lum_Component_Make_Field_F32 (C_glow, ring_intensity,    "ring_intensity",  1.0f),
+  Lum_Component_Make_Field_F32 (C_glow, ring_inner_decay,  "ring_inner_decay",1.0f),
+  Lum_Component_Make_Field_F32 (C_glow, ring_outer_decay,  "ring_outer_decay",1.0f),
 };
 
-static void register_component_fields() {
-  lum_serial_register_component(lum_app_get_ecs(), "test", sizeof(Component_test), component_test_fields, 2);
-}
-
-static void write_components() {
-  lum_Entity e = lum_ecs_create_entity(lum_app_get_ecs());
-  lum_ecs_add(lum_app_get_ecs(), e, lum_ecs_component_type_from_name(lum_app_get_ecs(), "test"));
-  ((Component_test*)lum_ecs_get(lum_app_get_ecs(), e, lum_ecs_component_type_from_name(lum_app_get_ecs(), "test")))->b = 100;
-  lum_Archive writer;
-  lum_serial_init_writer(&writer);
-  lum_serial_w_linef(&writer, "entity %d", 1);
-  lum_serial_component_write(lum_app_get_ecs(), lum_ecs_component_type_from_name(lum_app_get_ecs(), "test"), 
-      lum_ecs_get(lum_app_get_ecs(), e, lum_ecs_component_type_from_name(lum_app_get_ecs(), "test")), &writer);
-  size_t sz = 0;
-  const char* out = lum_serial_writer_finish(&writer, &sz);
-  lum_fs_write("test.txt", out);
-}
-
-/* --- ECS 冒烟：父子层级 + 世界矩阵合成 --- */
-static lum_Entity g_ship, g_moon;
+static const lum_Component_field_desc g_beam_fields[] = {
+  Lum_Component_Make_Field_Vec2(C_beam, start_offset, "start",     0, 0),
+  Lum_Component_Make_Field_Vec2(C_beam, end_offset,   "end",       0, 0),
+  Lum_Component_Make_Field_F32 (C_beam, thickness,    "thickness", 10.0f),
+  Lum_Component_Make_Field_I32 (C_beam, mode,         "mode",      0),
+  Lum_Component_Make_Field_I32 (C_beam, layer,        "layer",     0),
+  Lum_Component_Make_Field_Vec4(C_beam, color,        "color",     1, 1, 1, 1),
+  Lum_Component_Make_Field_F32 (C_beam, core_size,    "core_size", 0.25f),
+  Lum_Component_Make_Field_F32 (C_beam, core_decay,   "core_decay",1.0f),
+  Lum_Component_Make_Field_F32 (C_beam, edge_decay,   "edge_decay",4.0f),
+};
 
 static lum_Vec2 sw(float sx, float sy) {
   return lum_app_screen_to_world(lum_vec2_create(sx, sy));
@@ -50,19 +72,101 @@ static void draw_text(const char* t, lum_Vec2 c, lum_Vec4 col) {
   lum_tr_draw_layer(g_font, t, lum_app_screen_to_world(c), 2, col);
 }
 
+/* ---------- 生成辅助 ---------- */
+
+static lum_Entity spawn_glow(lum_Ecs* ecs, lum_Vec2 position, const C_glow* desc) {
+  lum_Entity e = lum_ecs_create_entity(ecs);
+  lum_scene_add_transform(ecs, e)->position = position;
+  *(C_glow*)lum_ecs_add(ecs, e, C_glow_id) = *desc;
+  return e;
+}
+
+static lum_Entity spawn_beam(lum_Ecs* ecs, lum_Vec2 center, const C_beam* desc) {
+  lum_Entity e = lum_ecs_create_entity(ecs);
+  lum_scene_add_transform(ecs, e)->position = center;
+  *(C_beam*)lum_ecs_add(ecs, e, C_beam_id) = *desc;
+  return e;
+}
+
+/* ---------- 动画脚本 ---------- */
+
+static lum_Entity g_cursor;   /* 鼠标特效的父实体：每帧对齐光标 */
+
+static void cursor_follow(lum_Ecs* ecs, lum_Entity self, float dt) {
+  (void)dt;
+  lum_Component_transform* t = (lum_Component_transform*)lum_ecs_get(ecs, self, lum_Component_transform_id);
+  t->position = mw();
+}
+
+static lum_Entity g_orbit_a, g_orbit_b;   /* 两颗环绕光晕 */
+
+static void orbit_a_update(lum_Ecs* ecs, lum_Entity self, float dt) {
+  (void)dt;
+  lum_Component_transform* t = (lum_Component_transform*)lum_ecs_get(ecs, self, lum_Component_transform_id);
+  float now = lum_time_get_total();
+  t->position = sw(480.0f + cosf(now * 0.8f) * 70.0f, 300.0f + sinf(now * 1.1f) * 50.0f);
+}
+static void orbit_b_update(lum_Ecs* ecs, lum_Entity self, float dt) {
+  (void)dt;
+  lum_Component_transform* t = (lum_Component_transform*)lum_ecs_get(ecs, self, lum_Component_transform_id);
+  float now = lum_time_get_total();
+  t->position = sw(720.0f + sinf(now * 1.2f) * 55.0f, 300.0f + cosf(now * 0.9f) * 45.0f);
+}
+
+/* ---------- 渲染系统：光晕/光环、光束 ---------- */
+
+/* 世界矩阵平移分量（列主序：m[12], m[13]） */
+static lum_Vec2 world_translation(const lum_Component_transform* t) {
+  return lum_vec2_create(t->world.m[12], t->world.m[13]);
+}
+/* 世界矩阵变换本地偏移：父级的旋转/缩放会正确带动子实体光束端点 */
+static lum_Vec2 world_offset(const lum_Component_transform* t, lum_Vec2 local_offset) {
+  lum_Vec4 p = lum_mat4_mul_vec4(t->world, lum_vec4_create(local_offset.x, local_offset.y, 0.0f, 1.0f));
+  return lum_vec2_create(p.x, p.y);
+}
+
+static void glow_render_system(lum_Ecs* ecs, void* user_data) {
+  (void)user_data;
+  lum_renderer2d_set_blend_mode(Lum_Blend_Additive);
+  lum_Ecs_view v = lum_ecs_view_create2(ecs, lum_Component_transform_id, C_glow_id);
+  lum_Component_transform* t; C_glow* glow; lum_Entity e;
+  while ((e = lum_ecs_view_each2(&v, (void**)&t, (void**)&glow)) != Lum_Entity_Null) {
+    lum_Vec2 center = world_translation(t);   /* 世界位置：跟随父级（如鼠标光标） */
+    if (glow->ring) {
+      lum_glow_draw_ring_advanced(center, glow->radius, glow->layer, glow->color,
+                                  glow->ring_radius, glow->ring_width, glow->ring_intensity,
+                                  glow->ring_inner_decay, glow->ring_outer_decay);
+    } else {
+      lum_glow_draw_advanced(center, glow->radius, glow->layer, glow->color,
+                             glow->core_size, glow->core_decay, glow->edge_decay,
+                             glow->halo_intensity);
+    }
+  }
+}
+
+static void beam_render_system(lum_Ecs* ecs, void* user_data) {
+  (void)user_data;
+  lum_renderer2d_set_blend_mode(Lum_Blend_Additive);
+  lum_Ecs_view v = lum_ecs_view_create2(ecs, lum_Component_transform_id, C_beam_id);
+  lum_Component_transform* t; C_beam* beam; lum_Entity e;
+  while ((e = lum_ecs_view_each2(&v, (void**)&t, (void**)&beam)) != Lum_Entity_Null) {
+    /* 端点偏移过世界矩阵：跟随实体位置与父级层级变换 */
+    lum_beam_draw_advanced(world_offset(t, beam->start_offset),
+                           world_offset(t, beam->end_offset),
+                           beam->thickness, (lum_Beam_mode)beam->mode, beam->layer,
+                           beam->color, beam->core_size, beam->core_decay, beam->edge_decay);
+  }
+}
+
+/* ---------- 既有 ECS 冒烟保留：ship/moon 层级 ---------- */
+static lum_Entity g_ship, g_moon;
+
 static void ship_update(lum_Ecs* ecs, lum_Entity self, float dt) {
   (void)dt;
   lum_Component_transform* t = (lum_Component_transform*)lum_ecs_get(ecs, self, lum_Component_transform_id);
   float now = lum_time_get_total();
   t->position = sw(480.0f + cosf(now * 0.5f) * 160.0f, 160.0f + sinf(now * 0.8f) * 40.0f);
   t->rotation = now * 0.8f;
-}
-
-/* 渲染系统注册表冒烟：sprite 内置系统之后按注册序执行 */
-static void hud_render_system(lum_Ecs* ecs, void* user_data) {
-  (void)ecs; (void)user_data;
-  lum_renderer2d_draw_rect(sw(20, 160), lum_vec2_create(140, 18), 0.0f, lum_vec2_0(),
-                           3, lum_vec4_create(0.2f, 0.6f, 1.0f, 0.35f));
 }
 
 /* update 系统注册表冒烟：script 之后、世界矩阵之前执行——本帧改 size 本帧可见 */
@@ -74,23 +178,38 @@ static void moon_pulse_system(lum_Ecs* ecs, float dt, void* user_data) {
   sp->size = lum_vec2_create(pulse, pulse);
 }
 
-static void on_start(void) {
-  register_component_fields();
-  write_components();
+/* 渲染系统注册表冒烟：sprite 内置系统之后按注册序执行 */
+static void hud_render_system(lum_Ecs* ecs, void* user_data) {
+  (void)ecs; (void)user_data;
+  lum_renderer2d_set_blend_mode(Lum_Blend_Alpha);
+  lum_renderer2d_draw_rect(sw(20, 160), lum_vec2_create(140, 18), 0.0f, lum_vec2_0(),
+                           3, lum_vec4_create(0.2f, 0.6f, 1.0f, 0.35f));
+}
 
+static void on_start(void) {
   lum_renderer2d_set_clear_color(lum_vec4_create(0.03f, 0.03f, 0.05f, 1.0f));
   g_font = lum_assets_font("resources/FiraCode-Regular.ttf", 18);
+  lum_tr_preload_ascii(g_font);   /* 渲染前一次性光栅化全部 ASCII 字形 */
   g_ring = lum_assets_texture("resources/ring.png", Lum_Texture_Flag_None);
 
-  /* 去重自检：同请求二次调用应命中同一份资源 */
   if (lum_assets_texture("resources/ring.png", Lum_Texture_Flag_None) == g_ring) {
     Lum_Log_Info("assets: dedup ok, %u assets loaded", lum_assets_count());
   }
 
   lum_Ecs* ecs = lum_app_get_ecs();
+
+  /* demo 组件：注册 + 绑定字段表（F5/F9 存读档会带上特效） */
+  C_glow_id = lum_serial_register_component(ecs, "glow", sizeof(C_glow),
+                                            g_glow_fields, sizeof(g_glow_fields) / sizeof(g_glow_fields[0]));
+  C_beam_id = lum_serial_register_component(ecs, "beam", sizeof(C_beam),
+                                            g_beam_fields, sizeof(g_beam_fields) / sizeof(g_beam_fields[0]));
+
+  lum_scene_add_render_system(ecs, glow_render_system, NULL);
+  lum_scene_add_render_system(ecs, beam_render_system, NULL);
   lum_scene_add_render_system(ecs, hud_render_system, NULL);
   lum_scene_add_update_system(ecs, moon_pulse_system, NULL);
 
+  /* --- ship/moon 层级冒烟 --- */
   g_ship = lum_ecs_create_entity(ecs);
   lum_scene_add_transform(ecs, g_ship);
   lum_Component_sprite* ship_sprite = lum_scene_add_sprite(ecs, g_ship, g_ring);
@@ -100,15 +219,103 @@ static void on_start(void) {
 
   g_moon = lum_ecs_create_entity(ecs);
   lum_scene_add_transform(ecs, g_moon)->position = lum_vec2_create(70, 0);   /* 父级 scale=1，70 即 70 世界单位 */
-  lum_Component_sprite* moon_sprite = lum_scene_add_sprite(ecs, g_moon, g_ring);
+  lum_Component_sprite* moon_sprite = lum_scene_add_sprite(ecs, g_moon, &g_ring ? g_ring : NULL);
   moon_sprite->size = lum_vec2_create(16, 16);
   moon_sprite->color = lum_vec4_create(0.4f, 0.9f, 1.0f, 1.0f);
   lum_scene_set_parent(ecs, g_moon, g_ship);
+
+  /* --- 特效实体化：鼠标特效群（挂在跟随光标的父实体下） --- */
+  g_cursor = lum_ecs_create_entity(ecs);
+  lum_scene_add_transform(ecs, g_cursor);
+  lum_scene_add_script(ecs, g_cursor, NULL, cursor_follow, NULL);
+
+  C_glow glow;
+  memset(&glow, 0, sizeof(glow));
+  C_beam beam;
+  memset(&beam, 0, sizeof(beam));
+
+  /* 鼠标头部光晕 */
+  glow.ring = false;  glow.radius = 75.0f;  glow.layer = 0;
+  glow.color = lum_vec4_create(1.0f, 0.85f, 0.45f, 1.0f);
+  glow.core_size = 0.15f; glow.core_decay = 2.0f; glow.edge_decay = 4.0f; glow.halo_intensity = 0.4f;
+  lum_Entity mouse_glow = spawn_glow(ecs, lum_vec2_0(), &glow);
+  lum_scene_set_parent(ecs, mouse_glow, g_cursor);
+
+  /* 鼠标光圈（层 5） */
+  glow.ring = true;  glow.radius = 40.0f;  glow.layer = 5;
+  glow.color = lum_vec4_create(1.0f, 1.0f, 0.7f, 1.0f);
+  glow.ring_radius = 0.8f; glow.ring_width = 0.03f; glow.ring_intensity = 0.15f;
+  glow.ring_inner_decay = 0.15f; glow.ring_outer_decay = 0.5f;
+  lum_Entity mouse_ring = spawn_glow(ecs, lum_vec2_0(), &glow);
+  lum_scene_set_parent(ecs, mouse_ring, g_cursor);
+
+  /* 鼠标双光束 */
+  beam.thickness = 17.0f; beam.mode = Lum_Beam_Mode_Center; beam.layer = 0;
+  beam.color = lum_vec4_create(1.0f, 1.0f, 0.6f, 1.0f);
+  beam.core_size = 0.25f; beam.core_decay = 1.0f; beam.edge_decay = 4.0f;
+  beam.start_offset = lum_vec2_create(-60.0f, -50.0f);
+  beam.end_offset   = lum_vec2_create( 60.0f,  50.0f);
+  lum_Entity mouse_beam_a = spawn_beam(ecs, lum_vec2_0(), &beam);
+  lum_scene_set_parent(ecs, mouse_beam_a, g_cursor);
+  beam.start_offset = lum_vec2_create(-60.0f, 50.0f);
+  beam.end_offset   = lum_vec2_create( 60.0f, -50.0f);
+  lum_Entity mouse_beam_b = spawn_beam(ecs, lum_vec2_0(), &beam);
+  lum_scene_set_parent(ecs, mouse_beam_b, g_cursor);
+
+  /* --- 环绕光晕两颗（script 驱动轨道） --- */
+  glow.ring = false;  glow.layer = 0;
+  glow.color = lum_vec4_create(0.25f, 1.0f, 0.4f, 1.0f);
+  glow.radius = 80.0f; glow.core_size = 0.30f; glow.core_decay = 0.7f;
+  glow.edge_decay = Lum_Glow_Default_Edge_Decay; glow.halo_intensity = Lum_Glow_Default_Halo_Intensity;
+  g_orbit_a = spawn_glow(ecs, lum_vec2_0(), &glow);
+  lum_scene_add_script(ecs, g_orbit_a, NULL, orbit_a_update, NULL);
+
+  glow.color = lum_vec4_create(0.3f, 0.5f, 1.0f, 1.0f);
+  glow.radius = 85.0f; glow.core_size = 0.08f; glow.core_decay = 1.2f; glow.edge_decay = 8.0f;
+  g_orbit_b = spawn_glow(ecs, lum_vec2_0(), &glow);
+  lum_scene_add_script(ecs, g_orbit_b, NULL, orbit_b_update, NULL);
+
+  /* --- 静态特效：白色光晕 + 双光环 --- */
+  glow.ring = false;  glow.radius = 60.0f;
+  glow.color = lum_vec4_create(0.9f, 0.9f, 0.9f, 1.0f);
+  glow.core_size = 0.18f; glow.core_decay = 1.0f; glow.edge_decay = 4.0f; glow.halo_intensity = 0.35f;
+  spawn_glow(ecs, sw(480, 300), &glow);
+
+  glow.ring = true;  glow.radius = 70.0f;
+  glow.color = lum_vec4_create(1.0f, 0.65f, 0.2f, 1.0f);
+  glow.ring_radius = Lum_Glow_Default_Ring_Radius; glow.ring_width = Lum_Glow_Default_Ring_Width;
+  glow.ring_intensity = Lum_Glow_Default_Ring_Intensity;
+  glow.ring_inner_decay = Lum_Glow_Default_Ring_Inner_Decay;
+  glow.ring_outer_decay = Lum_Glow_Default_Ring_Outer_Decay;
+  spawn_glow(ecs, sw(240, 200), &glow);
+
+  glow.radius = 65.0f;
+  glow.color = lum_vec4_create(0.4f, 0.85f, 1.0f, 1.0f);
+  glow.ring_radius = 0.70f; glow.ring_width = 0.06f; glow.ring_intensity = 1.6f;
+  glow.ring_inner_decay = 3.0f; glow.ring_outer_decay = 0.6f;
+  spawn_glow(ecs, sw(240, 400), &glow);
+
+  /* --- 静态光束三条（三种衰减模式各一条） --- */
+  beam.layer = 0;
+  beam.thickness = 24.0f; beam.mode = Lum_Beam_Mode_Lateral;
+  beam.color = lum_vec4_create(1.0f, 0.6f, 0.2f, 1.0f);
+  beam.start_offset = lum_vec2_create(-360.0f, 0.0f);
+  beam.end_offset   = lum_vec2_create( 360.0f, 0.0f);
+  spawn_beam(ecs, sw(480, 500), &beam);
+
+  beam.thickness = 14.0f; beam.mode = Lum_Beam_Mode_Longitudinal;
+  beam.color = lum_vec4_create(0.3f, 0.6f, 1.0f, 1.0f);
+  spawn_beam(ecs, sw(480, 545), &beam);
+
+  beam.thickness = 32.0f; beam.mode = Lum_Beam_Mode_Center;
+  beam.color = lum_vec4_create(0.6f, 1.0f, 0.6f, 1.0f);
+  spawn_beam(ecs, sw(480, 576), &beam);
 }
+
 static void on_update(float dt) {
   (void)dt;
   if (lum_input_is_key_pressed(Lum_Key_Q)) lum_app_quit();
-  /* 场景序列化：F5 存档 / F9 读档（读档会清空并恢复，ship/moon 回到存档瞬间状态） */
+  /* 场景序列化：F5 存档 / F9 读档——特效实体随 C_glow/C_beam 字段表一起持久化 */
   if (lum_input_is_key_pressed(Lum_Key_F5)) {
     if (lum_scene_save(lum_app_get_ecs(), "scene_demo.lum"))
       printf("[demo] scene saved.\n");
@@ -118,54 +325,19 @@ static void on_update(float dt) {
       printf("[demo] scene loaded.\n");
   }
 }
+
 static void on_render(void) {
   lum_Vec4 white = {1,1,1,1};
   lum_Vec4 gray  = {0.6f,0.6f,0.6f,1};
 
-  draw_text("glow demo (procedural, additive)  [Q] quit", lum_vec2_create(20,38), white);
-
-  float t = lum_time_get_total();
-
-  /* additive blend 下画光晕：颜色直接加到背景，越叠越亮 */
-  lum_renderer2d_set_blend_mode(Lum_Blend_Additive);
-
-  /* 鼠标头部光晕：保持原参数不变（半径 90，全亮度） */
-  lum_glow_draw_advanced(mw(), 75.0f, 0, lum_vec4_create(1.0f, 0.85f, 0.45f, 1.0f),
-      0.15f, 2.0f, 4.0f, 0.4f);
-
-  lum_glow_draw_advanced(sw(480 + cosf(t*0.8f)*70, 300 + sinf(t*1.1f)*50), 80, 0,
-                   lum_vec4_create(0.25f, 1.0f, 0.4f, 1.0f), 0.30f, 0.7f, Lum_Glow_Default_Edge_Decay, Lum_Glow_Default_Halo_Intensity);   /* 更大更柔的核 */
-  lum_glow_draw_advanced(sw(720 + sinf(t*1.2f)*55, 300 + cosf(t*0.9f)*45), 85, 0,
-                   lum_vec4_create(0.3f, 0.5f, 1.0f, 1.0f), 0.08f, 1.2f, 8.0f, Lum_Glow_Default_Halo_Intensity);          /* 更尖的核 + 更宽的外晕 */
-  /* 重叠处更亮（additive 累加）—— 拖动 t 让它们交错 */
-  lum_glow_draw(sw(480, 300), 60, 0, lum_vec4_create(0.9f, 0.9f, 0.9f, 1.0f));
-
-  /* 光圈（光环）：中空亮环，可与光晕叠加 */
-  lum_glow_draw_ring(sw(240, 200), 70, 0, lum_vec4_create(1.0f, 0.65f, 0.2f, 1.0f));       /* 默认环 */
-  lum_glow_draw_ring_advanced(sw(240, 400), 65, 0,
-      lum_vec4_create(0.4f, 0.85f, 1.0f, 1.0f), 0.70f, 0.06f, 1.6f, 3.0f, 0.6f);        /* 硬内缘 + 软外缘 */
-
-  lum_glow_draw_ring_advanced(mw(), 40, 5, lum_vec4_create(1, 1, 0.7, 1), 0.8, 0.03, 0.15, 0.15f, 0.5f);
-  lum_beam_draw(lum_vec2_sub(mw(), lum_vec2_create(60, 50)), lum_vec2_add(mw(), lum_vec2_create(60, 50)), 17, Lum_Beam_Mode_Center, 0, lum_vec4_create(1, 1.0, 0.6, 1.0f));
-  lum_beam_draw(lum_vec2_sub(mw(), lum_vec2_create(60, -50)), lum_vec2_add(mw(), lum_vec2_create(60, -50)), 17, Lum_Beam_Mode_Center, 0, lum_vec4_create(1, 1.0f, 0.6f, 1.0f));
-  /* 横向模式：亮度从中心线向两侧衰减（光带，沿长度均匀） */
-  lum_beam_draw(sw(120, 500), sw(840, 500), 24, Lum_Beam_Mode_Lateral, 0,
-                lum_vec4_create(1.0f, 0.6f, 0.2f, 1.0f));
-
-  /* 纵向模式：亮度从中心点向两端衰减（光柱，中心最亮） */
-  lum_beam_draw(sw(120, 545), sw(840, 545), 14, Lum_Beam_Mode_Longitudinal, 0,
-                lum_vec4_create(0.3f, 0.6f, 1.0f, 1.0f));
-
-  /* 中心模式：亮度从中心点同时向宽度和长度方向衰减 */
-  lum_beam_draw(sw(120, 576), sw(840, 576), 32, Lum_Beam_Mode_Center, 0,
-                lum_vec4_create(0.6f, 1.0f, 0.6f, 1.0f));
-  lum_renderer2d_set_blend_mode(Lum_Blend_Alpha);
-
+  draw_text("glow demo (procedural, additive, ecs entities)  [Q] quit  [F5] save  [F9] load",
+            lum_vec2_create(20, 38), white);
   draw_text("additive: overlapping glows sum -> brighter", lum_vec2_create(20, 70), gray);
   draw_text("per-glow: core size / core decay / edge decay", lum_vec2_create(20, 92), gray);
   draw_text("rings: hollow-center light ring", lum_vec2_create(20, 114), gray);
   draw_text("ring params: radius / width / intensity / inner & outer decay", lum_vec2_create(20, 136), gray);
 }
+
 static void on_shutdown(void) {}
 
 int main(void) {
