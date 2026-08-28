@@ -85,7 +85,7 @@ bool lum_beam_is_initialized(void) {
   return g_beam.initialized;
 }
 
-void lum_beam_draw_layer_advanced(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay) {
+void lum_beam_draw_advanced(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay) {
   if (!g_beam.initialized) return;
   if (thickness <= 0.0f) return;
 
@@ -115,14 +115,6 @@ void lum_beam_draw_layer_advanced(lum_Vec2 start, lum_Vec2 end, float thickness,
   lum_renderer2d_draw_mesh(v, 4, idx, 6, Lum_Primitive_Triangles, material, NULL, layer);
 }
 
-void lum_beam_draw_layer(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color) {
-  lum_beam_draw_layer_advanced(start, end, thickness, mode, layer, color, Lum_Beam_Default_Core_Size, Lum_Beam_Default_Core_Decay, Lum_Beam_Default_Edge_Decay);
-}
-
-void lum_beam_draw_advanced(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, lum_Vec4 color, float core_size, float core_decay, float edge_decay) {
-  lum_beam_draw_layer_advanced(start, end, thickness, mode, 0, color, core_size, core_decay, edge_decay);
-}
-
-void lum_beam_draw(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, lum_Vec4 color) {
-  lum_beam_draw_layer(start, end, thickness, mode, 0, color);
+void lum_beam_draw(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color) {
+  lum_beam_draw_advanced(start, end, thickness, mode, layer, color, Lum_Beam_Default_Core_Size, Lum_Beam_Default_Core_Decay, Lum_Beam_Default_Edge_Decay);
 }

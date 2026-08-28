@@ -9,7 +9,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-static GLenum lum_texture_pixel_format(uint32_t channels) {
+static GLenum lum__texture_pixel_format(uint32_t channels) {
   switch (channels) {
     case 1: return GL_RED;
     case 3: return GL_RGB;
@@ -19,7 +19,7 @@ static GLenum lum_texture_pixel_format(uint32_t channels) {
 }
 
 /* 显式 sized internal format：unsized 格式由驱动自选，GL_R8 是 glyph atlas 的前提 */
-static GLenum lum_texture_internal_format(uint32_t channels) {
+static GLenum lum__texture_internal_format(uint32_t channels) {
   switch (channels) {
     case 1: return GL_R8;
     case 3: return GL_RGB8;
@@ -38,8 +38,8 @@ int lum_texture2d_create(lum_Texture2d* texture, int width, int height, uint32_t
     return 0;
   }
 
-  GLenum internal = lum_texture_internal_format(channels);
-  GLenum format = lum_texture_pixel_format(channels);
+  GLenum internal = lum__texture_internal_format(channels);
+  GLenum format = lum__texture_pixel_format(channels);
   if (!internal || !format) {
     Lum_Log_Error("texture: failed to create texture: unsupported channels %u.", channels);
     return 0;
@@ -119,7 +119,7 @@ int lum_texture2d_update_region(lum_Texture2d* texture, int x, int y, int w, int
     return 0;
   }
 
-  GLenum format = lum_texture_pixel_format(texture->channels);
+  GLenum format = lum__texture_pixel_format(texture->channels);
 
   glBindTexture(GL_TEXTURE_2D, texture->id);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

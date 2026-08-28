@@ -18,12 +18,12 @@ typedef struct lum_Time {
 
 static lum_Time g_time;
 
-static void lum_time_reset(void) {
+static void lum__time_reset(void) {
   memset(&g_time, 0, sizeof(g_time));
 }
 
 int lum_time_init(void) {
-  lum_time_reset();
+  lum__time_reset();
 
   float now = lum_window_get_time();
   if (now < 0.0f) return 0;
@@ -45,7 +45,7 @@ int lum_time_init(void) {
 
 void lum_time_shutdown(void) {
   if (!g_time.initialized) return;
-  lum_time_reset();
+  lum__time_reset();
 }
 
 bool lum_time_is_initialized(void) {

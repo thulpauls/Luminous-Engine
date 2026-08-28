@@ -129,11 +129,11 @@ typedef struct lum_Renderer2d {
 
 static lum_Renderer2d g_renderer2d;
 
-static void lum_renderer2d_reset_state(void) {
+static void lum__renderer2d_reset_state(void) {
   memset(&g_renderer2d, 0, sizeof(g_renderer2d));
 }
 
-static void lum_renderer2d_destroy_mesh_buffers(void) {
+static void lum__renderer2d_destroy_mesh_buffers(void) {
   if (g_renderer2d.mesh_EBO) glDeleteBuffers(1, &g_renderer2d.mesh_EBO);
   if (g_renderer2d.mesh_VBO) glDeleteBuffers(1, &g_renderer2d.mesh_VBO);
   if (g_renderer2d.mesh_VAO) glDeleteVertexArrays(1, &g_renderer2d.mesh_VAO);
@@ -142,12 +142,12 @@ static void lum_renderer2d_destroy_mesh_buffers(void) {
   g_renderer2d.mesh_VAO = 0;
 }
 
-static int lum_renderer2d_init_mesh_buffers(void) {
+static int lum__renderer2d_init_mesh_buffers(void) {
   glGenVertexArrays(1, &g_renderer2d.mesh_VAO);
   glGenBuffers(1, &g_renderer2d.mesh_VBO);
   glGenBuffers(1, &g_renderer2d.mesh_EBO);
   if (!(g_renderer2d.mesh_VAO && g_renderer2d.mesh_VBO && g_renderer2d.mesh_EBO)) {
-    lum_renderer2d_destroy_mesh_buffers();
+    lum__renderer2d_destroy_mesh_buffers();
     return 0;
   }
 
@@ -164,15 +164,15 @@ static int lum_renderer2d_init_mesh_buffers(void) {
   return 1;
 }
 
-static uint32_t lum_next_capacity(uint32_t capacity, uint32_t need, uint32_t initial_capacity) {
+static uint32_t lum__next_capacity(uint32_t capacity, uint32_t need, uint32_t initial_capacity) {
   uint32_t cap = lum_maxi(capacity, initial_capacity);
   while(cap < need) cap *= 2u;
   return cap;
 }
 
-static int lum_grow_buffer(void** ptr, uint32_t* capacity, uint32_t need, size_t elem_sz, uint32_t init_cap, const char* tag) {
+static int lum__grow_buffer(void** ptr, uint32_t* capacity, uint32_t need, size_t elem_sz, uint32_t init_cap, const char* tag) {
   if (need < *capacity) return 1;
-  uint32_t cap = lum_next_capacity(*capacity, need, init_cap);
+  uint32_t cap = lum__next_capacity(*capacity, need, init_cap);
   void* p = realloc(*ptr, elem_sz * (size_t)cap);
   
   if (!p) { 
@@ -185,47 +185,47 @@ static int lum_grow_buffer(void** ptr, uint32_t* capacity, uint32_t need, size_t
   return 1;
 }
 
-static void lum_grow_gl_buffer(uint32_t target, uint32_t buffer, uint32_t* capacity, uint32_t need, size_t elem_sz, uint32_t init_cap) {
+static void lum__grow_gl_buffer(uint32_t target, uint32_t buffer, uint32_t* capacity, uint32_t need, size_t elem_sz, uint32_t init_cap) {
   if (need <= *capacity) return;
-  uint32_t cap = lum_next_capacity(*capacity, need, init_cap);
+  uint32_t cap = lum__next_capacity(*capacity, need, init_cap);
   glBindBuffer(target, buffer);
   glBufferData(target, (GLsizeiptr)(elem_sz * (size_t)cap), NULL, GL_DYNAMIC_DRAW);
   *capacity = cap;
 }
 
-static int lum_mesh_ensure_command_capacity(uint32_t need) {
-  return lum_grow_buffer((void**)&g_renderer2d.mesh_commands, &g_renderer2d.mesh_command_capacity, need, sizeof(lum_Mesh_command), Lum_Renderer2d_Mesh_Initial_Command_Capacity, "mesh commands");
+static int lum__mesh_ensure_command_capacity(uint32_t need) {
+  return lum__grow_buffer((void**)&g_renderer2d.mesh_commands, &g_renderer2d.mesh_command_capacity, need, sizeof(lum_Mesh_command), Lum_Renderer2d_Mesh_Initial_Command_Capacity, "mesh commands");
 }
 
 
-static int lum_arena_ensure_vertices(uint32_t add) {
+static int lum__arena_ensure_vertices(uint32_t add) {
   uint32_t need = g_renderer2d.frame_vertex_count + add;
-  return lum_grow_buffer((void**)&g_renderer2d.frame_vertices, &g_renderer2d.frame_vertex_capacity, need, sizeof(lum_Vertex), Lum_Renderer2d_Mesh_Initial_Vertex_Capacity, "vertex arena");
+  return lum__grow_buffer((void**)&g_renderer2d.frame_vertices, &g_renderer2d.frame_vertex_capacity, need, sizeof(lum_Vertex), Lum_Renderer2d_Mesh_Initial_Vertex_Capacity, "vertex arena");
 }
 
-static int lum_arena_ensure_indices(uint32_t add) {
+static int lum__arena_ensure_indices(uint32_t add) {
   uint32_t need = g_renderer2d.frame_index_count + add;
-  return lum_grow_buffer((void**)&g_renderer2d.frame_indices, &g_renderer2d.frame_index_capacity, need, sizeof(uint32_t), Lum_Renderer2d_Mesh_Initial_Index_Capacity, "index arena");
+  return lum__grow_buffer((void**)&g_renderer2d.frame_indices, &g_renderer2d.frame_index_capacity, need, sizeof(uint32_t), Lum_Renderer2d_Mesh_Initial_Index_Capacity, "index arena");
 }
 
-static int lum_mesh_ensure_gather_index_capacity(uint32_t need) {  
-  return lum_grow_buffer((void**)&g_renderer2d.mesh_gather_index, &g_renderer2d.mesh_gather_index_capacity, need, sizeof(uint32_t), Lum_Renderer2d_Mesh_Initial_Index_Capacity, "gather index");
+static int lum__mesh_ensure_gather_index_capacity(uint32_t need) {  
+  return lum__grow_buffer((void**)&g_renderer2d.mesh_gather_index, &g_renderer2d.mesh_gather_index_capacity, need, sizeof(uint32_t), Lum_Renderer2d_Mesh_Initial_Index_Capacity, "gather index");
 }
 
-static int lum_mesh_ensure_scratch_vertices(uint32_t need) {  
-  return lum_grow_buffer((void**)&g_renderer2d.mesh_scratch_vertices, &g_renderer2d.mesh_scratch_vertex_capacity, need, sizeof(lum_Vertex), Lum_Renderer2d_Mesh_Initial_Vertex_Capacity, "scratch vertices");
+static int lum__mesh_ensure_scratch_vertices(uint32_t need) {  
+  return lum__grow_buffer((void**)&g_renderer2d.mesh_scratch_vertices, &g_renderer2d.mesh_scratch_vertex_capacity, need, sizeof(lum_Vertex), Lum_Renderer2d_Mesh_Initial_Vertex_Capacity, "scratch vertices");
 }
 
-static void lum_mesh_ensure_gl_vertex_capacity(uint32_t need) {
-  lum_grow_gl_buffer(GL_ARRAY_BUFFER, g_renderer2d.mesh_VBO, &g_renderer2d.mesh_gl_vertex_capacity, need, sizeof(lum_Vertex), Lum_Renderer2d_Mesh_Initial_Vertex_Capacity);
+static void lum__mesh_ensure_gl_vertex_capacity(uint32_t need) {
+  lum__grow_gl_buffer(GL_ARRAY_BUFFER, g_renderer2d.mesh_VBO, &g_renderer2d.mesh_gl_vertex_capacity, need, sizeof(lum_Vertex), Lum_Renderer2d_Mesh_Initial_Vertex_Capacity);
 }
 
-static void lum_mesh_ensure_gl_index_capacity(uint32_t need) {
-  lum_grow_gl_buffer(GL_ELEMENT_ARRAY_BUFFER, g_renderer2d.mesh_EBO, &g_renderer2d.mesh_gl_index_capacity, need, sizeof(uint32_t), Lum_Renderer2d_Mesh_Initial_Index_Capacity);
+static void lum__mesh_ensure_gl_index_capacity(uint32_t need) {
+  lum__grow_gl_buffer(GL_ELEMENT_ARRAY_BUFFER, g_renderer2d.mesh_EBO, &g_renderer2d.mesh_gl_index_capacity, need, sizeof(uint32_t), Lum_Renderer2d_Mesh_Initial_Index_Capacity);
 }
 
 int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h) {
-  lum_renderer2d_reset_state();
+  lum__renderer2d_reset_state();
 
   g_renderer2d.viewport_x = 0;
   g_renderer2d.viewport_y = 0;
@@ -250,7 +250,7 @@ int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h) {
     lum_renderer2d_shutdown();
     return 0;
   }
-  if (!lum_renderer2d_init_mesh_buffers()) {
+  if (!lum__renderer2d_init_mesh_buffers()) {
     lum_renderer2d_shutdown();
     return 0;
   }
@@ -267,7 +267,7 @@ int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h) {
 void lum_renderer2d_shutdown(void) {
   if (!g_renderer2d.initialized) return;
 
-  lum_renderer2d_destroy_mesh_buffers();
+  lum__renderer2d_destroy_mesh_buffers();
   free(g_renderer2d.mesh_commands); 
   g_renderer2d.mesh_commands = NULL;
   free(g_renderer2d.frame_vertices); 
@@ -283,11 +283,7 @@ void lum_renderer2d_shutdown(void) {
   lum_shader_destroy(&g_renderer2d.sprite_shader);
   lum_shader_destroy(&g_renderer2d.circle_shader);
 
-  lum_renderer2d_reset_state();
-}
-
-bool lum_renderer2d_is_initialized(void) {
-  return g_renderer2d.initialized;
+  lum__renderer2d_reset_state();
 }
 
 void lum_renderer2d_set_viewport(int x, int y, int w, int h) {
@@ -319,7 +315,7 @@ void lum_renderer2d_begin_frame(void) {
   g_renderer2d.current_blend_mode = Lum_Blend_Alpha;
 }
 
-static GLenum lum_mesh_primitive_to_gl(lum_Primitive p) {
+static GLenum lum__mesh_primitive_to_gl(lum_Primitive p) {
   switch (p) {
     case Lum_Primitive_Triangles: return GL_TRIANGLES;
     case Lum_Primitive_Triangle_Strip: return GL_TRIANGLE_STRIP;
@@ -332,7 +328,7 @@ static GLenum lum_mesh_primitive_to_gl(lum_Primitive p) {
   }
 }
 
-static void lum_mesh_apply_param(const lum_Material* mat, const lum_Material_parameter* p) {
+static void lum__mesh_apply_param(const lum_Material* mat, const lum_Material_parameter* p) {
   switch (p->type) {
     case Lum_Material_Parameter_1i: lum_shader_uniform_set1i(mat->shader, p->name, p->value.i);  break;
     case Lum_Material_Parameter_1f: lum_shader_uniform_set1f(mat->shader, p->name, p->value.f);  break;
@@ -344,7 +340,7 @@ static void lum_mesh_apply_param(const lum_Material* mat, const lum_Material_par
   }
 }
 
-static int lum_mesh_command_compare(const void* left, const void* right) {
+static int lum__mesh_command_compare(const void* left, const void* right) {
   const lum_Mesh_command* a = (const lum_Mesh_command*)left;
   const lum_Mesh_command* b = (const lum_Mesh_command*)right;
   if (a->layer != b->layer) return (a->layer > b->layer) - (a->layer < b->layer);
@@ -360,10 +356,10 @@ static int lum_mesh_command_compare(const void* left, const void* right) {
   return (a->sequence > b->sequence) - (a->sequence < b->sequence);
 }
 
-static void lum_renderer2d_flush_mesh_batch(uint32_t begin, uint32_t end, uint32_t batch_vcount, uint32_t batch_icount) {
-  lum_mesh_ensure_gl_vertex_capacity(batch_vcount);
-  lum_mesh_ensure_gl_index_capacity(batch_icount);
-  if (!lum_mesh_ensure_gather_index_capacity(batch_icount)) return;
+static void lum__renderer2d_flush_mesh_batch(uint32_t begin, uint32_t end, uint32_t batch_vcount, uint32_t batch_icount) {
+  lum__mesh_ensure_gl_vertex_capacity(batch_vcount);
+  lum__mesh_ensure_gl_index_capacity(batch_icount);
+  if (!lum__mesh_ensure_gather_index_capacity(batch_icount)) return;
 
   glBindVertexArray(g_renderer2d.mesh_VAO);
   glBindBuffer(GL_ARRAY_BUFFER, g_renderer2d.mesh_VBO);
@@ -387,7 +383,7 @@ static void lum_renderer2d_flush_mesh_batch(uint32_t begin, uint32_t end, uint32
   const lum_Mesh_command* base = &g_renderer2d.mesh_commands[begin];
   const lum_Material* material = base->material;
 
-  GLenum gl_mode = lum_mesh_primitive_to_gl(base->primitive);
+  GLenum gl_mode = lum__mesh_primitive_to_gl(base->primitive);
   if (gl_mode == GL_LINES || gl_mode == GL_LINE_STRIP || gl_mode == GL_LINE_LOOP) {
     glLineWidth(g_renderer2d.current_line_width);
   } else if (gl_mode == GL_POINTS) {
@@ -398,7 +394,7 @@ static void lum_renderer2d_flush_mesh_batch(uint32_t begin, uint32_t end, uint32
   lum_shader_uniform_set4m(material->shader, "u_view_projection", g_renderer2d.view_projection);
   lum_shader_uniform_set1i(material->shader, "u_texture", 0);
   for (uint32_t p = 0; p < material->param_count; ++p) {
-    lum_mesh_apply_param(material, &material->params[p]);
+    lum__mesh_apply_param(material, &material->params[p]);
   }
 
   lum_texture2d_bind(base->texture, 0);
@@ -419,12 +415,12 @@ static void lum_renderer2d_flush_mesh_batch(uint32_t begin, uint32_t end, uint32
   g_renderer2d.current_frame_draw_call_count++;
 }
 
-static void lum_renderer2d_flush_mesh_commands(void) {
+static void lum__renderer2d_flush_mesh_commands(void) {
   if (!g_renderer2d.has_view_projection) return;
   if (g_renderer2d.mesh_command_count == 0) return;
 
   if (g_renderer2d.mesh_command_count > 1u) {
-    qsort(g_renderer2d.mesh_commands, g_renderer2d.mesh_command_count, sizeof(lum_Mesh_command), lum_mesh_command_compare);
+    qsort(g_renderer2d.mesh_commands, g_renderer2d.mesh_command_count, sizeof(lum_Mesh_command), lum__mesh_command_compare);
   }
 
   uint32_t i = 0;
@@ -438,14 +434,14 @@ static void lum_renderer2d_flush_mesh_commands(void) {
       batch_icount += c->index_count;
       ++j;
     }
-    lum_renderer2d_flush_mesh_batch(i, j, batch_vcount, batch_icount);
+    lum__renderer2d_flush_mesh_batch(i, j, batch_vcount, batch_icount);
     i = j;
   }
 }
 
 void lum_renderer2d_end_frame(void) {
   if (!g_renderer2d.initialized) return;
-  lum_renderer2d_flush_mesh_commands();
+  lum__renderer2d_flush_mesh_commands();
 }
 
 void lum_renderer2d_clear(void) {
@@ -480,15 +476,7 @@ void lum_renderer2d_set_blend_mode(lum_Blend_mode mode) {
   }
 }
 
-void lum_renderer2d_enable_blend(void) {
-  lum_renderer2d_set_blend_mode(Lum_Blend_Alpha);
-}
-
-void lum_renderer2d_disable_blend(void) {
-  lum_renderer2d_set_blend_mode(Lum_Blend_None);
-}
-
-void lum_renderer2d_create_vertex(lum_Vertex* vertex, lum_Vec3 position, lum_Vec2 uv, lum_Vec4 color) {
+static void lum__renderer2d_create_vertex(lum_Vertex* vertex, lum_Vec3 position, lum_Vec2 uv, lum_Vec4 color) {
   vertex->position[0] = position.x;
   vertex->position[1] = position.y;
   vertex->position[2] = 0.0f;
@@ -500,7 +488,7 @@ void lum_renderer2d_create_vertex(lum_Vertex* vertex, lum_Vec3 position, lum_Vec
   vertex->color[3] = color.w;
 }
 
-void lum_build_quad_uv(lum_Mat4 model, lum_Vec4 uv_rect, lum_Vec4 color, lum_Vertex out_verts[4]) {
+static void lum__build_quad_uv(lum_Mat4 model, lum_Vec4 uv_rect, lum_Vec4 color, lum_Vertex out_verts[4]) {
   static const lum_Vec2 local[4] = { {0.0f,0.0f}, {1.0f,0.0f}, {1.0f,1.0f}, {0.0f,1.0f} };
   const lum_Vec2 uv[4] = {
     { uv_rect.x, uv_rect.y },
@@ -520,7 +508,7 @@ void lum_build_quad_uv(lum_Mat4 model, lum_Vec4 uv_rect, lum_Vec4 color, lum_Ver
 }
 
 void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]) {
-  lum_build_quad_uv(model, lum_vec4_create(0.0f, 0.0f, 1.0f, 1.0f), color, out_verts);
+  lum__build_quad_uv(model, lum_vec4_create(0.0f, 0.0f, 1.0f, 1.0f), color, out_verts);
 }
 
 void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count, const uint32_t* indices, uint32_t index_count, lum_Primitive primitive, const lum_Material* material, const lum_Texture2d* texture, int32_t layer) {
@@ -537,9 +525,9 @@ void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count,
     gen_count = vertex_count;
   }
 
-  if (!lum_arena_ensure_vertices(vertex_count)) return;
-  if (!lum_arena_ensure_indices(gen_count)) return;
-  if (!lum_mesh_ensure_command_capacity(g_renderer2d.mesh_command_count + 1u)) return;
+  if (!lum__arena_ensure_vertices(vertex_count)) return;
+  if (!lum__arena_ensure_indices(gen_count)) return;
+  if (!lum__mesh_ensure_command_capacity(g_renderer2d.mesh_command_count + 1u)) return;
 
   const lum_Texture2d* eff_texture = texture ? texture : &g_renderer2d.white_texture;
 
@@ -593,7 +581,7 @@ void lum_renderer2d_draw_fullscreen(const lum_Material* material, const lum_Text
   g_renderer2d.has_view_projection = has_vp;
 }
 
-void lum_renderer2d_draw_sprite_layer(const lum_Texture2d* texture, const lum_Transform2d* transform, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_sprite(const lum_Texture2d* texture, const lum_Transform2d* transform, int32_t layer, lum_Vec4 color) {
   static const uint32_t lum_quad_indices[6] = { 0, 1, 2, 2, 3, 0 };
 
   Lum_Assert(texture && transform);
@@ -604,18 +592,7 @@ void lum_renderer2d_draw_sprite_layer(const lum_Texture2d* texture, const lum_Tr
   lum_renderer2d_draw_mesh(v, 4, lum_quad_indices, 6, Lum_Primitive_Triangles, &g_renderer2d.sprite_material, texture, layer);
 }
 
-void lum_renderer2d_draw_rect_layer(const lum_Transform2d* transform, int32_t layer, lum_Vec4 color) {
-  lum_renderer2d_draw_sprite_layer(&g_renderer2d.white_texture, transform, layer, color);
-}
-
-void lum_renderer2d_draw_sprite_ex_layer(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color) {
-  if (!g_renderer2d.initialized) return;
-
-  lum_Transform2d t = lum_transform2d_create(position, size, lum_vec2_1(), rotation_rad, origin);
-  lum_renderer2d_draw_sprite_layer(texture, &t, layer, color);
-}
-
-void lum_renderer2d_draw_sprite_uv_layer(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, lum_Vec4 uv_rect, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_sprite_uv(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, lum_Vec4 uv_rect, int32_t layer, lum_Vec4 color) {
   static const uint32_t lum_quad_indices[6] = { 0, 1, 2, 2, 3, 0 };
 
   Lum_Assert(texture);
@@ -624,19 +601,29 @@ void lum_renderer2d_draw_sprite_uv_layer(const lum_Texture2d* texture, lum_Vec2 
   lum_Transform2d t = lum_transform2d_create(position, size, lum_vec2_1(), 0.0f, lum_vec2_0());
   lum_Mat4 model = lum_transform2d_get_matrix(&t);
   lum_Vertex v[4];
-  lum_build_quad_uv(model, uv_rect, color, v);
+  lum__build_quad_uv(model, uv_rect, color, v);
   lum_renderer2d_draw_mesh(v, 4, lum_quad_indices, 6, Lum_Primitive_Triangles, &g_renderer2d.sprite_material, texture, layer);
 }
 
-void lum_renderer2d_draw_rect_ex_layer(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color) {
-  lum_renderer2d_draw_sprite_ex_layer(&g_renderer2d.white_texture, position, size, rotation_rad, origin, layer, color);
+void lum_renderer2d_draw_sprite_matrix_uv(const lum_Texture2d* texture, lum_Mat4 model,
+                                                 lum_Vec4 uv_rect, int32_t layer, lum_Vec4 color) {
+  static const uint32_t lum_quad_indices[6] = { 0, 1, 2, 2, 3, 0 };
+
+  Lum_Assert(texture);
+  if (!g_renderer2d.initialized) return;
+
+  lum_Vertex v[4];
+  lum__build_quad_uv(model, uv_rect, color, v);
+  lum_renderer2d_draw_mesh(v, 4, lum_quad_indices, 6, Lum_Primitive_Triangles,
+                           &g_renderer2d.sprite_material, texture, layer);
 }
 
-void lum_renderer2d_draw_line(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Vec4 color) {
-  lum_renderer2d_draw_line_layer(start, end, thickness, 0, color);
+void lum_renderer2d_draw_rect(lum_Vec2 position, lum_Vec2 size, float rotation_rad, lum_Vec2 origin, int32_t layer, lum_Vec4 color) {
+  lum_Transform2d t = lum_transform2d_create(position, size, lum_vec2_1(), rotation_rad, origin);
+  lum_renderer2d_draw_sprite(&g_renderer2d.white_texture, &t, layer, color);
 }
 
-void lum_renderer2d_draw_line_layer(lum_Vec2 start, lum_Vec2 end, float thickness, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_line(lum_Vec2 start, lum_Vec2 end, float thickness, int32_t layer, lum_Vec4 color) {
   if (!g_renderer2d.initialized || thickness < 0.0f) return;
   lum_Vec2 d = lum_vec2_sub(start, end);
   lum_Vec2 center = lum_vec2_lerp(start, end, 0.5f);
@@ -645,14 +632,10 @@ void lum_renderer2d_draw_line_layer(lum_Vec2 start, lum_Vec2 end, float thicknes
   if (lum_float_is_zero(len)) return;
   float angle = atan2f(d.y, d.x);
 
-  lum_renderer2d_draw_rect_ex_layer(center, lum_vec2_create(len, thickness), angle, lum_vec2_create(len * 0.5f, thickness * 0.5f), layer, color);
+  lum_renderer2d_draw_rect(center, lum_vec2_create(len, thickness), angle, lum_vec2_create(len * 0.5f, thickness * 0.5f), layer, color);
 }
 
-void lum_renderer2d_draw_circle(lum_Vec2 position, float radius, lum_Vec4 color) {
-  lum_renderer2d_draw_circle_layer(position, radius, 0, color);
-}
-
-void lum_renderer2d_draw_circle_layer(lum_Vec2 position, float radius, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_circle(lum_Vec2 position, float radius, int32_t layer, lum_Vec4 color) {
   if (!g_renderer2d.initialized) return;
   if (radius < 0.0f) return;
   lum_Vec2 size = lum_vec2_scale(lum_vec2_create(radius, radius), 2.0f);
@@ -664,59 +647,44 @@ void lum_renderer2d_draw_circle_layer(lum_Vec2 position, float radius, int32_t l
   lum_renderer2d_draw_mesh(v, 4, lum_quad_indices, 6, Lum_Primitive_Triangles, &g_renderer2d.circle_material, NULL, layer);
 }
 
-void lum_renderer2d_draw_triangle(lum_Vec2 p0, lum_Vec2 p1, lum_Vec2 p2, lum_Vec4 color) {
-  lum_renderer2d_draw_triangle_layer(p0, p1, p2, 0, color);
-}
-void lum_renderer2d_draw_triangle_layer(lum_Vec2 p0, lum_Vec2 p1, lum_Vec2 p2, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_triangle(lum_Vec2 p0, lum_Vec2 p1, lum_Vec2 p2, int32_t layer, lum_Vec4 color) {
   if (!g_renderer2d.initialized) return;
   lum_Vertex v[3];
-  lum_renderer2d_create_vertex(&v[0], lum_vec2_to_vec3(p0), lum_vec2_0(), color);
-  lum_renderer2d_create_vertex(&v[1], lum_vec2_to_vec3(p1), lum_vec2_0(), color);
-  lum_renderer2d_create_vertex(&v[2], lum_vec2_to_vec3(p2), lum_vec2_0(), color);
+  lum__renderer2d_create_vertex(&v[0], lum_vec2_to_vec3(p0), lum_vec2_0(), color);
+  lum__renderer2d_create_vertex(&v[1], lum_vec2_to_vec3(p1), lum_vec2_0(), color);
+  lum__renderer2d_create_vertex(&v[2], lum_vec2_to_vec3(p2), lum_vec2_0(), color);
   static const uint32_t idx[3] = { 0, 1, 2 };
   lum_renderer2d_draw_mesh(v, 3, idx, 3, Lum_Primitive_Triangles, &g_renderer2d.sprite_material, &g_renderer2d.white_texture, layer);
 }
 
-void lum_renderer2d_draw_polygon_convex(const lum_Vec2* points, uint32_t count, lum_Vec4 color) {
-  lum_renderer2d_draw_polygon_convex_layer(points, count, 0, color);
-}
-
-void lum_renderer2d_draw_polygon_convex_layer(const lum_Vec2* points, uint32_t count, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_polygon_convex(const lum_Vec2* points, uint32_t count, int32_t layer, lum_Vec4 color) {
   if (!g_renderer2d.initialized) return;
   if (!points || count < 3) return;
-  if (!lum_mesh_ensure_scratch_vertices(count)) return;
+  if (!lum__mesh_ensure_scratch_vertices(count)) return;
   for (uint32_t i = 0; i < count; ++i) {
-    lum_renderer2d_create_vertex(&g_renderer2d.mesh_scratch_vertices[i], lum_vec2_to_vec3(points[i]), lum_vec2_0(), color);
+    lum__renderer2d_create_vertex(&g_renderer2d.mesh_scratch_vertices[i], lum_vec2_to_vec3(points[i]), lum_vec2_0(), color);
   }
 
   lum_renderer2d_draw_mesh(g_renderer2d.mesh_scratch_vertices, count, NULL, 0, Lum_Primitive_Triangle_Fan, &g_renderer2d.sprite_material, &g_renderer2d.white_texture, layer);
 }
 
-void lum_renderer2d_draw_polyline(const lum_Vec2* points, uint32_t count, float thickness, lum_Vec4 color) {
-  lum_renderer2d_draw_polyline_layer(points, count, thickness, 0, color);
-}
-
-void lum_renderer2d_draw_polyline_layer(const lum_Vec2* points, uint32_t count, float thickness, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_polyline(const lum_Vec2* points, uint32_t count, float thickness, int32_t layer, lum_Vec4 color) {
   if (!g_renderer2d.initialized) return;
   if (!points || count < 2) return;
-  if (!lum_mesh_ensure_scratch_vertices(count)) return;
+  if (!lum__mesh_ensure_scratch_vertices(count)) return;
   for (uint32_t i = 0; i < count; ++i){
-    lum_renderer2d_create_vertex(&g_renderer2d.mesh_scratch_vertices[i], lum_vec2_to_vec3(points[i]), lum_vec2_0(), color);
+    lum__renderer2d_create_vertex(&g_renderer2d.mesh_scratch_vertices[i], lum_vec2_to_vec3(points[i]), lum_vec2_0(), color);
   }
   g_renderer2d.current_line_width = (thickness > 0.0f) ? thickness : 1.0f;
   lum_renderer2d_draw_mesh(g_renderer2d.mesh_scratch_vertices, count, NULL, 0, Lum_Primitive_Line_Strip, &g_renderer2d.sprite_material, &g_renderer2d.white_texture, layer);
 }
 
-void lum_renderer2d_draw_points(const lum_Vec2* points, uint32_t count, float size, lum_Vec4 color) {
-  lum_renderer2d_draw_points_layer(points, count, size, 0, color);
-}
-
-void lum_renderer2d_draw_points_layer(const lum_Vec2* points, uint32_t count, float size, int32_t layer, lum_Vec4 color) {
+void lum_renderer2d_draw_points(const lum_Vec2* points, uint32_t count, float size, int32_t layer, lum_Vec4 color) {
   if (!g_renderer2d.initialized) return;
   if (!points || count == 0) return;
-  if (!lum_mesh_ensure_scratch_vertices(count)) return;
+  if (!lum__mesh_ensure_scratch_vertices(count)) return;
   for (uint32_t i = 0; i < count; ++i){
-    lum_renderer2d_create_vertex(&g_renderer2d.mesh_scratch_vertices[i], lum_vec2_to_vec3(points[i]), lum_vec2_0(), color);
+    lum__renderer2d_create_vertex(&g_renderer2d.mesh_scratch_vertices[i], lum_vec2_to_vec3(points[i]), lum_vec2_0(), color);
   }
   g_renderer2d.current_point_size = (size > 0.0f) ? size : 1.0f;
   lum_renderer2d_draw_mesh(g_renderer2d.mesh_scratch_vertices, count, NULL, 0, Lum_Primitive_Points, &g_renderer2d.sprite_material, &g_renderer2d.white_texture, layer);

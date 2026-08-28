@@ -21,7 +21,7 @@ typedef struct lum_Log {
 
 static lum_Log g_log;
 
-static void lum_log_reset(void) {
+static void lum__log_reset(void) {
     memset(&g_log, 0, sizeof(g_log));
 }
 
@@ -50,7 +50,7 @@ static const char* lum__log_level_get_color(lum_Log_level level) {
 }
 
 int lum_log_init(void) {
-    lum_log_reset();
+    lum__log_reset();
 
     g_log.min_level = Lum_Log_Level_Debug;
     g_log.use_color = Lum_Is_Tty(stderr);
@@ -71,7 +71,7 @@ void lum_log_shutdown(void) {
         fclose(g_log.file);
         g_log.file = NULL;
     }
-    lum_log_reset();
+    lum__log_reset();
 }
 
 void lum_log_message(lum_Log_level level, const char* file, int line, const char* fn, const char* fmt, ...) {

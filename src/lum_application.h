@@ -5,6 +5,7 @@
 #include "lum_math2d.h"
 #include "lum_log.h"
 #include "lum_camera.h"
+#include "lum_ecs.h"
 
 typedef struct lum_App_desc {
     bool initialized;
@@ -33,6 +34,7 @@ int lum_app_run(const lum_App_desc* desc);
 void lum_app_quit(void);
 
 struct lum_Camera2d* lum_app_get_camera(void);
+lum_Ecs* lum_app_get_ecs(void);
 
 float lum_app_get_delta(void);
 

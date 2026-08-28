@@ -22,22 +22,22 @@ typedef struct lum_Input {
 
 static lum_Input g_input;
 
-static void lum_input_reset(void) {
+static void lum__input_reset(void) {
   memset(&g_input, 0, sizeof(g_input));
 }
 
-static void lum_input_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+static void lum__input_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
   g_input.scroll_acc.x += (float)xoffset;
   g_input.scroll_acc.y += (float)yoffset;
 }
 
 int lum_input_init(void) {
-  lum_input_reset();
+  lum__input_reset();
   GLFWwindow* window = (GLFWwindow*)lum_window_get_native_handle();
   if (!window) return 0;
 
   double mouse_x, mouse_y;
-  glfwSetScrollCallback(window, lum_input_scroll_callback);
+  glfwSetScrollCallback(window, lum__input_scroll_callback);
   glfwGetCursorPos(window, &mouse_x, &mouse_y);
   g_input.mouse_position.x = (float)mouse_x;
   g_input.mouse_position.y = (float)mouse_y;
@@ -50,7 +50,7 @@ int lum_input_init(void) {
 
 void lum_input_shutdown(void) {
   if (!g_input.initialized) return;
-  lum_input_reset();
+  lum__input_reset();
 }
 
 void lum_input_update(void) {

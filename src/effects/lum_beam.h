@@ -27,8 +27,7 @@ bool lum_beam_is_initialized(void);
 * @param mode      衰减模式
 * @param color     color.rgb 为光色，color.a 在 additive blend 时不参与混合
 */
-void lum_beam_draw(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, lum_Vec4 color);
-void lum_beam_draw_layer(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color);
+void lum_beam_draw(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color);
 
 /*
 * @brief 绘制线状光效，可独立调节核心宽度 / 核心强度 / 边缘衰减
@@ -41,7 +40,6 @@ void lum_beam_draw_layer(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam
 * @param core_decay  核心强度乘数
 * @param edge_decay  边缘衰减系数
 */
-void lum_beam_draw_advanced(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, lum_Vec4 color, float core_size, float core_decay, float edge_decay);
-void lum_beam_draw_layer_advanced(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay);
+void lum_beam_draw_advanced(lum_Vec2 start, lum_Vec2 end, float thickness, lum_Beam_mode mode, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay);
 
 #endif //Lum_Beam_H

@@ -17,24 +17,24 @@ typedef struct lum_Window {
 
 static lum_Window g_window;
 
-static void lum_window_reset(void) {
+static void lum__window_reset(void) {
   memset(&g_window, 0, sizeof(g_window));
 }
 
-static void lum_window_framebuffer_size_callback(GLFWwindow* window, int w, int h) {
+static void lum__window_framebuffer_size_callback(GLFWwindow* window, int w, int h) {
   g_window.framebuffer_width = (uint32_t)w;
   g_window.framebuffer_height = (uint32_t)h;
   glViewport(0, 0, w, h);
 }
 
-static void lum_window_size_callback(GLFWwindow* window, int w, int h) {
+static void lum__window_size_callback(GLFWwindow* window, int w, int h) {
   g_window.width = (uint32_t)w;
   g_window.height = (uint32_t)h;
 }
 
 int lum_window_init(const char* title, uint32_t w, uint32_t h) {
   Lum_Assert(title);
-  lum_window_reset();
+  lum__window_reset();
 
   if (!glfwInit()) return 0;
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -60,8 +60,8 @@ int lum_window_init(const char* title, uint32_t w, uint32_t h) {
     return 0;
   }
 
-  glfwSetFramebufferSizeCallback(handle, lum_window_framebuffer_size_callback);
-  glfwSetWindowSizeCallback(handle, lum_window_size_callback);
+  glfwSetFramebufferSizeCallback(handle, lum__window_framebuffer_size_callback);
+  glfwSetWindowSizeCallback(handle, lum__window_size_callback);
 
   g_window.handle = handle;
   g_window.initialized = true;
@@ -77,7 +77,7 @@ void lum_window_shutdown(void) {
   if (!g_window.initialized) return;
   glfwDestroyWindow(g_window.handle);
   glfwTerminate();
-  lum_window_reset();
+  lum__window_reset();
 }
 
 bool lum_window_is_initialized(void) {

@@ -37,16 +37,16 @@ typedef struct lum_Text_renderer {
   lum_Glyph glyphs[128];
 } lum_Text_renderer;
 
-static void lum_font_reset(lum_Font* font) {
+static void lum__font_reset(lum_Font* font) {
   memset(font, 0, sizeof(*font));
 }
 
-static void lum_text_renderer_reset(lum_Text_renderer* tr) {
+static void lum__text_renderer_reset(lum_Text_renderer* tr) {
   memset(tr, 0, sizeof(*tr));
 }
 
-static int lum_tr_initialize_renderer(lum_Text_renderer* tr, const char* font, float height_pixel) {
-  lum_text_renderer_reset(tr);
+static int lum__tr_initialize_renderer(lum_Text_renderer* tr, const char* font, float height_pixel) {
+  lum__text_renderer_reset(tr);
 
   tr->font_buffer = lum_fs_read_binary(font).data;
   if (!tr->font_buffer) return 0;
@@ -78,7 +78,7 @@ static int lum_tr_initialize_renderer(lum_Text_renderer* tr, const char* font, f
   return 1;
 }
 
-static void lum_tr_destroy_renderer(lum_Text_renderer* tr) {
+static void lum__tr_destroy_renderer(lum_Text_renderer* tr) {
   if (!tr) return;
 
   lum_texture2d_destroy(&tr->atlas_tex);
@@ -91,10 +91,10 @@ static void lum_tr_destroy_renderer(lum_Text_renderer* tr) {
 }
 
 int lum_tr_load_font(lum_Font* font, const char* text, float height_pixel) {
-    lum_font_reset(font);
+    lum__font_reset(font);
     lum_Text_renderer* tr = malloc(sizeof(*tr));
     if (!tr) return 0;
-    if (!lum_tr_initialize_renderer(tr, text, height_pixel)) {
+    if (!lum__tr_initialize_renderer(tr, text, height_pixel)) {
         free(tr);
         return 0;
     }
@@ -105,13 +105,13 @@ int lum_tr_load_font(lum_Font* font, const char* text, float height_pixel) {
 
 void lum_tr_destroy_font(lum_Font* font) {
     if(!font->initialized) return;
-    lum_tr_destroy_renderer((lum_Text_renderer*)font->renderer);
+    lum__tr_destroy_renderer((lum_Text_renderer*)font->renderer);
     free((lum_Text_renderer*)font->renderer);
     font->renderer = NULL;
     font->initialized = false;
 }
 
-static int lum_tr_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
+static int lum__tr_load_glyph(lum_Text_renderer* tr, unsigned int codepoint) {
   Lum_Assert(codepoint < 128);
 
   lum_Glyph* glyph = &tr->glyphs[codepoint];
@@ -198,7 +198,7 @@ void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int3
       continue;
     }
 
-    if (!lum_tr_load_glyph(tr, c)) continue;
+    if (!lum__tr_load_glyph(tr, c)) continue;
 
     lum_Glyph* glyph = &tr->glyphs[c];
 
@@ -208,7 +208,7 @@ void lum_tr_draw_layer(lum_Font* font, const char* text, lum_Vec2 position, int3
       float w = (float)glyph->width;
       float h = (float)glyph->height;
 
-      lum_renderer2d_draw_sprite_uv_layer(&tr->atlas_tex, lum_vec2_create(xpos, ypos),
+      lum_renderer2d_draw_sprite_uv(&tr->atlas_tex, lum_vec2_create(xpos, ypos),
                                           lum_vec2_create(w, h), glyph->uv, layer, color);
     }
 
@@ -249,7 +249,7 @@ lum_Vec2 lum_tr_measure_text(lum_Font* font, const char* text) {
       continue;
     }
 
-    if (!lum_tr_load_glyph(tr, c)) continue;
+    if (!lum__tr_load_glyph(tr, c)) continue;
 
     lum_Glyph* glyph = &tr->glyphs[c];
 

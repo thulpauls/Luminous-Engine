@@ -117,7 +117,7 @@ bool lum_glow_is_initialized(void) {
   return g_glow.initialized;
 }
 
-void lum_glow_draw_layer_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay, float halo_intensity) {
+void lum_glow_draw_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay, float halo_intensity) {
   if (!g_glow.initialized) return;
   if (radius < 0.0f) return;
 
@@ -140,19 +140,11 @@ void lum_glow_draw_layer_advanced(lum_Vec2 center, float radius, int32_t layer, 
   lum_renderer2d_draw_mesh(v, 4, idx, 6, Lum_Primitive_Triangles, material, NULL, layer);
 }
 
-void lum_glow_draw_layer(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color) {
-  lum_glow_draw_layer_advanced(center, radius, layer, color, Lum_Glow_Default_Core_Size, Lum_Glow_Default_Core_Decay, Lum_Glow_Default_Edge_Decay, Lum_Glow_Default_Halo_Intensity);
+void lum_glow_draw(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color) {
+  lum_glow_draw_advanced(center, radius, layer, color, Lum_Glow_Default_Core_Size, Lum_Glow_Default_Core_Decay, Lum_Glow_Default_Edge_Decay, Lum_Glow_Default_Halo_Intensity);
 }
 
-void lum_glow_draw_advanced(lum_Vec2 center, float radius, lum_Vec4 color, float core_size, float core_decay, float edge_decay, float halo_intensity) {
-  lum_glow_draw_layer_advanced(center, radius, 0, color, core_size, core_decay, edge_decay, halo_intensity);
-}
-
-void lum_glow_draw(lum_Vec2 center, float radius, lum_Vec4 color) {
-  lum_glow_draw_layer(center, radius, 0, color);
-}
-
-void lum_glow_draw_ring_layer_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float ring_radius, float ring_width, float ring_intensity, float ring_inner_decay, float ring_outer_decay) {
+void lum_glow_draw_ring_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float ring_radius, float ring_width, float ring_intensity, float ring_inner_decay, float ring_outer_decay) {
   if (!g_glow.initialized) return;
   if (radius < 0.0f) return;
 
@@ -176,14 +168,6 @@ void lum_glow_draw_ring_layer_advanced(lum_Vec2 center, float radius, int32_t la
   lum_renderer2d_draw_mesh(v, 4, idx, 6, Lum_Primitive_Triangles, material, NULL, layer);
 }
 
-void lum_glow_draw_ring_layer(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color) {
-  lum_glow_draw_ring_layer_advanced(center, radius, layer, color, Lum_Glow_Default_Ring_Radius, Lum_Glow_Default_Ring_Width, Lum_Glow_Default_Ring_Intensity, Lum_Glow_Default_Ring_Inner_Decay, Lum_Glow_Default_Ring_Outer_Decay);
-}
-
-void lum_glow_draw_ring_advanced(lum_Vec2 center, float radius, lum_Vec4 color, float ring_radius, float ring_width, float ring_intensity, float ring_inner_decay, float ring_outer_decay) {
-  lum_glow_draw_ring_layer_advanced(center, radius, 0, color, ring_radius, ring_width, ring_intensity, ring_inner_decay, ring_outer_decay);
-}
-
-void lum_glow_draw_ring(lum_Vec2 center, float radius, lum_Vec4 color) {
-  lum_glow_draw_ring_layer(center, radius, 0, color);
+void lum_glow_draw_ring(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color) {
+  lum_glow_draw_ring_advanced(center, radius, layer, color, Lum_Glow_Default_Ring_Radius, Lum_Glow_Default_Ring_Width, Lum_Glow_Default_Ring_Intensity, Lum_Glow_Default_Ring_Inner_Decay, Lum_Glow_Default_Ring_Outer_Decay);
 }

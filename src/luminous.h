@@ -1,23 +1,14 @@
 #ifndef Luminous_H
 #define Luminous_H
 
-/* ===========================================================================
- *  Luminous —— OpenGL 2D 图形框架.
- *
- *  分层组织, 依赖自底向上:
- *
- *      基础层  —— 日志, 数学
- *      平台层  —— 文件系统, 窗口, 输入, 时间
- *      渲染层  —— 着色器, 纹理, 相机, 变换, 2D 渲染器
- *      子系统  —— 文本渲染
- * =========================================================================== */
-
 #include "lum_application.h"
 
 /* --- 基础层 --- */
 #include "lum_log.h"
 #include "lum_assert.h"
 #include "lum_math2d.h"
+#include "containers/lum_vector.h"
+#include "containers/lum_list.h"
 
 /* --- 平台层 --- */
 #include "lum_filesystem.h"
@@ -35,6 +26,17 @@
 #include "lum_renderer2d.h"
 #include "lum_material.h"
 #include "lum_render_target.h"
+
+/* --- 资源层 --- */
+#include "lum_assets.h"
+
+/* --- 序列化层 --- */
+#include "lum_serial.h"
+
+/* --- 场景层 --- */
+#include "lum_ecs.h"
+#include "lum_scene.h"
+#include "lum_scene_io.h"
 
 /* --- 特效 --- */
 #include "effects/lum_effects.h"

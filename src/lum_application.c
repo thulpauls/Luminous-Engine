@@ -3,6 +3,8 @@
 #include "lum_input.h"
 #include "lum_time.h"
 #include "lum_renderer2d.h"
+#include "lum_scene.h"
+#include "lum_assets.h"
 #include "effects/lum_effects.h"
 #include <string.h>
 #include <stdbool.h>
@@ -12,12 +14,13 @@ typedef struct lum_Application {
     bool running;
     uint32_t last_framebuffer_w, last_framebuffer_h;
     lum_Camera2d camera;
+    lum_Ecs* ecs;
     float delta;
 } lum_Application;
 
 static lum_Application g_application;
 
-static int lum_app_init_subsystems(const lum_App_desc* desc) {
+static int lum__app_init_subsystems(const lum_App_desc* desc) {
     if (!lum_log_init()) return 0;
     lum_log_set_min_level(desc->log_level);
 
@@ -43,7 +46,7 @@ static int lum_app_init_subsystems(const lum_App_desc* desc) {
         goto failure_renderer2d;
     }
     lum_renderer2d_set_clear_color(desc->clear_color);
-    lum_renderer2d_enable_blend();
+    lum_renderer2d_set_blend_mode(Lum_Blend_Alpha);
 
     if (!lum_effects_init()) {
         Lum_Log_Fatal("app: effects init failed.");
@@ -52,10 +55,24 @@ static int lum_app_init_subsystems(const lum_App_desc* desc) {
 
     lum_camera2d_init(&g_application.camera, (float)desc->width, (float)desc->height);
 
+    g_application.ecs = lum_ecs_create();
+    if (!g_application.ecs || !lum_scene_init(g_application.ecs)) {
+        Lum_Log_Fatal("app: ecs/scene init failed.");
+        goto failure_effects;
+    }
+
+    if (!lum_assets_init()) {
+        Lum_Log_Fatal("app: assets init failed.");
+        goto failure_ecs;
+    }
+
     g_application.last_framebuffer_w = lum_window_get_framebuffer_width();
     g_application.last_framebuffer_h = lum_window_get_framebuffer_height();
     return 1;
 
+failure_ecs:
+    if (g_application.ecs) lum_ecs_destroy(g_application.ecs);
+    g_application.ecs = NULL;
 failure_effects:
     lum_renderer2d_shutdown();
 failure_renderer2d:
@@ -69,7 +86,10 @@ failure_window:
     return 0;
 }
 
-static void lum_app_shutdown_subsystems(void) {
+static void lum__app_shutdown_subsystems(void) {
+    lum_assets_shutdown();   /* 资源是 GL 对象：必须在 renderer/window 拆除前销毁 */
+    lum_ecs_destroy(g_application.ecs);
+    g_application.ecs = NULL;
     lum_effects_shutdown();
     lum_renderer2d_shutdown();
     lum_time_shutdown();
@@ -78,7 +98,7 @@ static void lum_app_shutdown_subsystems(void) {
     lum_log_shutdown();
 }
 
-static void lum_app_sync_viewport(void) {
+static void lum__app_sync_viewport(void) {
     uint32_t framebuffer_w = lum_window_get_framebuffer_width();
     uint32_t framebuffer_h = lum_window_get_framebuffer_height();
     if (framebuffer_w == g_application.last_framebuffer_w && framebuffer_h == g_application.last_framebuffer_h) return;
@@ -118,7 +138,7 @@ int lum_app_run(const lum_App_desc* desc) {
     memset(&g_application, 0, sizeof(g_application));
     g_application.running = true;
 
-    if (!lum_app_init_subsystems(&d)) return 0;
+    if (!lum__app_init_subsystems(&d)) return 0;
 
     if (d.on_start) d.on_start();
 
@@ -129,14 +149,16 @@ int lum_app_run(const lum_App_desc* desc) {
         lum_time_update();
         g_application.delta = lum_time_get_delta();
 
-        lum_app_sync_viewport();
+        lum__app_sync_viewport();
         lum_renderer2d_set_camera(&g_application.camera);
 
         if (d.on_update) d.on_update(g_application.delta);
+        lum_scene_update(g_application.ecs, g_application.delta);
 
         lum_renderer2d_begin_frame();
         lum_renderer2d_clear();
         if (d.on_render) d.on_render();
+        lum_scene_render(g_application.ecs);
         lum_renderer2d_end_frame();
 
         lum_window_swap_buffers();
@@ -145,7 +167,7 @@ int lum_app_run(const lum_App_desc* desc) {
 
     if (d.on_shutdown) d.on_shutdown();
 
-    lum_app_shutdown_subsystems();
+    lum__app_shutdown_subsystems();
     return 0;
 }
 
@@ -156,6 +178,10 @@ void lum_app_quit(void) {
 
 lum_Camera2d* lum_app_get_camera(void) {
     return &g_application.camera;
+}
+
+lum_Ecs* lum_app_get_ecs(void) {
+    return g_application.ecs;
 }
 
 float lum_app_get_delta(void) {

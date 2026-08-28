@@ -26,8 +26,7 @@ bool lum_glow_is_initialized(void);
 * @param radius 可见半径
 * @param color color.rgb 为光色，color.a 在 additive blend 时不参与混合
 */
-void lum_glow_draw(lum_Vec2 center, float radius, lum_Vec4 color);
-void lum_glow_draw_layer(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color);
+void lum_glow_draw(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color);
 
 /*
 * @brief 绘制高斯衰减光晕，可独立调节核心大小 / 核心衰减 / 边缘衰减 / 外围亮度
@@ -39,8 +38,7 @@ void lum_glow_draw_layer(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 
 * @param edge_decay     外晕衰减系数
 * @param halo_intensity 外围亮度乘数，控制外晕整体明暗
 */
-void lum_glow_draw_advanced(lum_Vec2 center, float radius, lum_Vec4 color, float core_size, float core_decay, float edge_decay, float halo_intensity);
-void lum_glow_draw_layer_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay, float halo_intensity);
+void lum_glow_draw_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float core_size, float core_decay, float edge_decay, float halo_intensity);
 
 /*
 * @brief 绘制环形光环
@@ -48,8 +46,7 @@ void lum_glow_draw_layer_advanced(lum_Vec2 center, float radius, int32_t layer, 
 * @param radius 可见半径
 * @param color color.rgb 为光色，color.a 在 additive blend 时不参与混合
 */
-void lum_glow_draw_ring(lum_Vec2 center, float radius, lum_Vec4 color);
-void lum_glow_draw_ring_layer(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color);
+void lum_glow_draw_ring(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color);
 
 /*
 * @brief 绘制环形光环，可独立调节环半径 / 环厚度 / 亮度 / 内外侧衰减速率
@@ -62,7 +59,6 @@ void lum_glow_draw_ring_layer(lum_Vec2 center, float radius, int32_t layer, lum_
 * @param ring_inner_decay 内侧（朝中心方向）衰减速率
 * @param ring_outer_decay 外侧（朝边缘方向）衰减速率
 */
-void lum_glow_draw_ring_advanced(lum_Vec2 center, float radius, lum_Vec4 color, float ring_radius, float ring_width, float ring_intensity, float ring_inner_decay, float ring_outer_decay);
-void lum_glow_draw_ring_layer_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float ring_radius, float ring_width, float ring_intensity, float ring_inner_decay, float ring_outer_decay);
+void lum_glow_draw_ring_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Vec4 color, float ring_radius, float ring_width, float ring_intensity, float ring_inner_decay, float ring_outer_decay);
 
 #endif //Lum_Glow_H
