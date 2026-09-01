@@ -88,6 +88,9 @@ typedef struct lum_Mesh_command {
   uint64_t sequence;
   uint32_t vertex_offset, vertex_count;
   uint32_t index_offset, index_count;
+  lum_Mat4 view_projection;   /* draw 时快照：不同投影（世界/UI 像素空间）不入同批 */
+  bool has_scissor;           /* draw 时快照：不同剪裁不入同批（渲染目标像素、左下原点） */
+  int32_t scissor[4];
 } lum_Mesh_command;
 
 typedef struct lum_Renderer2d {
@@ -125,6 +128,8 @@ typedef struct lum_Renderer2d {
   float current_line_width;
   float current_point_size;
   lum_Blend_mode current_blend_mode;   /* draw_mesh 时记入命令；flush 每批按命令设 GL */
+  bool current_has_scissor;            /* 同上：命令级剪裁状态 */
+  int32_t current_scissor[4];
 } lum_Renderer2d;
 
 static lum_Renderer2d g_renderer2d;
@@ -311,6 +316,7 @@ void lum_renderer2d_begin_frame(void) {
   g_renderer2d.frame_index_count = 0;
   g_renderer2d.current_frame_draw_call_count = 0;
   g_renderer2d.current_line_width = 1.0f;
+  g_renderer2d.current_has_scissor = false;
   g_renderer2d.current_point_size = 1.0f;
   g_renderer2d.current_blend_mode = Lum_Blend_Alpha;
 }
@@ -344,6 +350,13 @@ static int lum__mesh_command_compare(const void* left, const void* right) {
   const lum_Mesh_command* a = (const lum_Mesh_command*)left;
   const lum_Mesh_command* b = (const lum_Mesh_command*)right;
   if (a->layer != b->layer) return (a->layer > b->layer) - (a->layer < b->layer);
+  int vp_cmp = memcmp(&a->view_projection, &b->view_projection, sizeof(lum_Mat4));
+  if (vp_cmp != 0) return vp_cmp;
+  if (a->has_scissor != b->has_scissor) return (int)a->has_scissor - (int)b->has_scissor;
+  if (a->has_scissor) {
+    int sc_cmp = memcmp(a->scissor, b->scissor, sizeof(a->scissor));
+    if (sc_cmp != 0) return sc_cmp;
+  }
   if (a->material != b->material) return (a->material > b->material) - (a->material < b->material);
   if (a->texture != b->texture) {
     uint32_t at = a->texture ? a->texture->id : 0;
@@ -391,7 +404,7 @@ static void lum__renderer2d_flush_mesh_batch(uint32_t begin, uint32_t end, uint3
   }
 
   lum_shader_use(material->shader);
-  lum_shader_uniform_set4m(material->shader, "u_view_projection", g_renderer2d.view_projection);
+  lum_shader_uniform_set4m(material->shader, "u_view_projection", base->view_projection);
   lum_shader_uniform_set1i(material->shader, "u_texture", 0);
   for (uint32_t p = 0; p < material->param_count; ++p) {
     lum__mesh_apply_param(material, &material->params[p]);
@@ -403,6 +416,14 @@ static void lum__renderer2d_flush_mesh_batch(uint32_t begin, uint32_t end, uint3
   }
 
   lum_renderer2d_set_blend_mode(base->blend);
+  if (base->has_scissor) {
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(g_renderer2d.viewport_x + base->scissor[0],
+              g_renderer2d.viewport_y + base->scissor[1],
+              base->scissor[2], base->scissor[3]);
+  } else {
+    glDisable(GL_SCISSOR_TEST);
+  }
 
   glDrawElements(gl_mode, (GLsizei)batch_icount, GL_UNSIGNED_INT, 0);
   
@@ -430,6 +451,9 @@ static void lum__renderer2d_flush_mesh_commands(void) {
     while (j < g_renderer2d.mesh_command_count) {
       const lum_Mesh_command* c = &g_renderer2d.mesh_commands[j];
       if (c->layer != base->layer || c->material != base->material || c->texture != base->texture || c->primitive != base->primitive || c->blend != base->blend) break;
+      if (memcmp(&c->view_projection, &base->view_projection, sizeof(lum_Mat4)) != 0) break;
+      if (c->has_scissor != base->has_scissor) break;
+      if (c->has_scissor && memcmp(c->scissor, base->scissor, sizeof(c->scissor)) != 0) break;
       batch_vcount += c->vertex_count;
       batch_icount += c->index_count;
       ++j;
@@ -437,6 +461,7 @@ static void lum__renderer2d_flush_mesh_commands(void) {
     lum__renderer2d_flush_mesh_batch(i, j, batch_vcount, batch_icount);
     i = j;
   }
+  glDisable(GL_SCISSOR_TEST);   /* 末批若带剪裁：还原，避免污染本帧后续 clear 等 GL 操作 */
 }
 
 void lum_renderer2d_end_frame(void) {
@@ -464,6 +489,10 @@ void lum_renderer2d_set_view_projection(lum_Mat4 view_proj) {
   g_renderer2d.has_view_projection = true;
 }
 
+lum_Mat4 lum_renderer2d_view_projection(void) {
+  return g_renderer2d.view_projection;
+}
+
 void lum_renderer2d_set_blend_mode(lum_Blend_mode mode) {
   if (!g_renderer2d.initialized) return;
   g_renderer2d.current_blend_mode = mode;   /* 记状态：draw_mesh 记入命令，flush 按命令设 GL */
@@ -474,6 +503,20 @@ void lum_renderer2d_set_blend_mode(lum_Blend_mode mode) {
     case Lum_Blend_Premul: glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); break;
     default: break;
   }
+}
+
+void lum_renderer2d_set_scissor(int x, int y, int w, int h) {
+  if (!g_renderer2d.initialized) return;
+  g_renderer2d.current_has_scissor = true;   /* 记状态：draw_mesh 记入命令，flush 按命令设 GL */
+  g_renderer2d.current_scissor[0] = x;
+  g_renderer2d.current_scissor[1] = y;
+  g_renderer2d.current_scissor[2] = w;
+  g_renderer2d.current_scissor[3] = h;
+}
+
+void lum_renderer2d_clear_scissor(void) {
+  if (!g_renderer2d.initialized) return;
+  g_renderer2d.current_has_scissor = false;
 }
 
 static void lum__renderer2d_create_vertex(lum_Vertex* vertex, lum_Vec3 position, lum_Vec2 uv, lum_Vec4 color) {
@@ -556,6 +599,14 @@ void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count,
   cmd->vertex_count = vertex_count;
   cmd->index_offset = ioff;
   cmd->index_count = gen_count;
+  cmd->view_projection = g_renderer2d.view_projection;
+  cmd->has_scissor = g_renderer2d.current_has_scissor;
+  if (cmd->has_scissor) {
+    cmd->scissor[0] = g_renderer2d.current_scissor[0];
+    cmd->scissor[1] = g_renderer2d.current_scissor[1];
+    cmd->scissor[2] = g_renderer2d.current_scissor[2];
+    cmd->scissor[3] = g_renderer2d.current_scissor[3];
+  }
 }
 
 void lum_renderer2d_draw_fullscreen(const lum_Material* material, const lum_Texture2d* src, int32_t layer) {

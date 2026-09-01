@@ -235,6 +235,12 @@ void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 c
     lum_tr_draw_layer(font, text, position, 0, color);
 }
 
+float lum_tr_ascent(lum_Font* font) {
+  if (!font || !font->initialized) return 0.0f;
+  lum_Text_renderer* tr = (lum_Text_renderer*)font->renderer;
+  return (float)tr->ascent * tr->scale;
+}
+
 lum_Vec2 lum_tr_measure_text(lum_Font* font, const char* text) {
   lum_Vec2 size = lum_vec2_create(0.0f, 0.0f);
   Lum_Assert(font && text);

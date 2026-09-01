@@ -38,10 +38,14 @@
 #include "lum_scene.h"
 #include "lum_scene_io.h"
 
+/* --- 内置扩展组件 --- */
+#include "components/lum_components.h"
+
 /* --- 特效 --- */
 #include "effects/lum_effects.h"
 
 /* --- 子系统 --- */
 #include "lum_text_renderer.h"
+#include "lum_ui.h"
 
 #endif //Luminous_H

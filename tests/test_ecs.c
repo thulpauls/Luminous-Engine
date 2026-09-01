@@ -221,6 +221,27 @@ static void test_view_out_param_order(void) {
   lum_ecs_destroy(ecs);
 }
 
+/* 回归：flush 后槽位复用再挂同类组件——sparse 残留曾导致 add 误判「已挂」静默丢组件 */
+static void test_recycled_slot_readd(void) {
+  lum_Ecs* ecs = lum_ecs_create();
+  lum_Component_type t = lum_ecs_register_component(ecs, "t", sizeof(T_pos));
+
+  lum_Entity a = lum_ecs_create_entity(ecs);
+  *(T_pos*)lum_ecs_add(ecs, a, t) = (T_pos){1, 2};
+
+  lum_ecs_destroy_entity(ecs, a);
+  lum_ecs_flush(ecs);                          /* 压缩 + 回收槽位（旧版在此留下 sparse 残留） */
+
+  lum_Entity b = lum_ecs_create_entity(ecs);   /* 复用 a 的槽位 */
+  T_pos* p = (T_pos*)lum_ecs_add(ecs, b, t);
+  CHECK(p != NULL);
+  p->x = 7; p->y = 9;
+  T_pos* q = (T_pos*)lum_ecs_get(ecs, b, t);
+  CHECK(q == p && q->x == 7 && q->y == 9);     /* 真实入池 + 新数据生效，非旧实体残骸 */
+
+  lum_ecs_destroy(ecs);
+}
+
 int main(void) {
   test_basic();
   test_generation();
@@ -228,6 +249,7 @@ int main(void) {
   test_stress();
   test_name_type();
   test_view_out_param_order();
+  test_recycled_slot_readd();
   printf("lum_ecs tests: %d passed, %d failed\n", g_pass, g_fail);
   return g_fail ? 1 : 0;
 }

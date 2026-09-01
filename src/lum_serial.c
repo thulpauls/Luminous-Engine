@@ -306,6 +306,9 @@ void lum_serial_consume(lum_Archive* archive) {
 
 void lum_serial_begin_component(lum_Archive* archive) {
   lum_vector_clear(&archive->segment);
+  /* 段内 Archive_line.argv 指向自身 raw：vector 扩容 realloc 搬移内存会悬空化已存条目的指针
+     （copy_line 的重定基址只覆盖插入瞬间）。预留段容量上限，保证装载期间零扩容 */
+  lum_vector_reserve(&archive->segment, Lum_Serial_Max_Segment_Fields);
   archive->segment_loaded = false;
 }
 

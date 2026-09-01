@@ -28,4 +28,7 @@ void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 c
 */
 lum_Vec2 lum_tr_measure_text(lum_Font* font, const char* text);
 
+/* 基线到行顶的上升高度（像素）＝ ascent × scale；UI 顶边对齐换算用 */
+float lum_tr_ascent(lum_Font* font);
+
 #endif //Lum_Text_Renderer_H

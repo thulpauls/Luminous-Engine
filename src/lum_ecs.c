@@ -169,7 +169,12 @@ void lum_ecs_flush(lum_Ecs* ecs) {
     uint32_t w = 0;
     for (uint32_t i = 0; i < lum_vector_size(&pool->entities); ++i) {
       lum_Entity e = entities[i];
-      if (!lum_ecs_alive(ecs, e)) continue;
+      if (!lum_ecs_alive(ecs, e)) {
+        /* 死亡实体的 sparse 残留必须清除：槽位回收后新实体若命中陈旧映射，
+            add 会误判「已挂」而静默丢失组件（场景加载崩溃/特效消失的根因） */
+        sparse[lum__entity_index(e)] = Lum_Pool_Sparse_None;
+        continue;
+      }
       if (w != i) {
         entities[w] = e;
         memmove(components + (size_t)w * pool->size,

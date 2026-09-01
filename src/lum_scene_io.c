@@ -22,6 +22,11 @@ static const lum_Component_field_desc g_transform_fields[] = {
   Lum_Component_Make_Field_Vec2(lum_Component_transform, origin,   "origin",   0, 0),
 };
 
+/* name：纯值组件，字段表一条即完事（Str 读方向以缓冲容量截断） */
+static const lum_Component_field_desc g_name_fields[] = {
+  Lum_Component_Make_Field_Str(lum_Component_name, text, "text", ""),
+};
+
 /* sprite：texture 指针 ⇄ 路径超出字段表表达力，走回调；其余字段为值 */
 static int sprite_write(const void* component, lum_Archive* archive) {
   const lum_Component_sprite* sprite = (const lum_Component_sprite*)component;
@@ -59,12 +64,41 @@ static int sprite_read(void* component, lum_Archive* archive) {
   return 1;
 }
 
+/* script：函数指针不可落盘，按「脚本名注册表」序列化名字；user_data 不序列化 */
+static int script_write(const void* component, lum_Archive* archive) {
+  const lum_Component_script* script = (const lum_Component_script*)component;
+  const char* name = lum_scene_script_name(script->start, script->update);
+  if (!name) {
+    Lum_Log_Warn("scene_io: unregistered script (fn pair) skipped in save.");
+    return 1;
+  }
+  if (script->user_data) {
+    Lum_Log_Warn("scene_io: script '%s' has user_data, it will be NULL after load.", name);
+  }
+  lum_serial_w_str(archive, "name", name);
+  return 1;
+}
+
+static int script_read(void* component, lum_Archive* archive) {
+  lum_Component_script* script = (lum_Component_script*)component;
+  char name[Lum_Serial_Max_Line];
+  lum_serial_r_str(archive, "name", "", name, sizeof(name));
+  if (!name[0]) return 1;
+  if (!lum_scene_script_lookup(name, &script->start, &script->update)) {
+    Lum_Log_Warn("scene_io: unknown script '%s', callbacks left NULL.", name);
+  }
+  return 1;
+}
+
 int lum_scene_io_init(lum_Ecs* ecs) {
   if (!ecs) return 0;
   /* 组件本体已由 lum_scene_init 注册；这里只附加序列化途径（不得重复注册） */
   lum_ecs_set_component_field_table(ecs, lum_Component_transform_id, g_transform_fields,
                                     sizeof(g_transform_fields) / sizeof(g_transform_fields[0]));
+  lum_ecs_set_component_field_table(ecs, lum_Component_name_id, g_name_fields,
+                                    sizeof(g_name_fields) / sizeof(g_name_fields[0]));
   lum_ecs_set_component_serializer(ecs, lum_Component_sprite_id, sprite_write, sprite_read);
+  lum_ecs_set_component_serializer(ecs, lum_Component_script_id, script_write, script_read);
   return 1;
 }
 
@@ -207,6 +241,7 @@ int lum_scene_load(lum_Ecs* ecs, const char* path) {
   uint32_t current_ordinal = Lum_Scene_Io_No_Ordinal;
   lum_Entity current_entity = Lum_Entity_Null;
   int ok = 1;
+  uint32_t loadstat_entities = 0, loadstat_components = 0, loadstat_links = 0;
 
   while (lum_serial_peek(&reader)) {
     const char* key = lum_serial_peek_key(&reader);
@@ -227,6 +262,7 @@ int lum_scene_load(lum_Ecs* ecs, const char* path) {
       if (ok) {
         *(lum_Entity*)lum_vector_get(&handle_by_ordinal, current_ordinal) = current_entity;
       }
+      loadstat_entities++;
       lum_serial_consume(&reader);
     }
     else if (strcmp(key, "component") == 0) {
@@ -251,6 +287,7 @@ int lum_scene_load(lum_Ecs* ecs, const char* path) {
       void* component = lum_ecs_add(ecs, current_entity, type);
       if (component) {
         lum_serial_component_read(ecs, type, component, &reader);
+        loadstat_components++;
       } else {
         lum_serial_begin_component(&reader);
         Lum_Log_Warn("scene_io: component add failed ('%s'), fields skipped.", component_name);
@@ -283,8 +320,13 @@ int lum_scene_load(lum_Ecs* ecs, const char* path) {
     lum_Entity parent = *(const lum_Entity*)lum_vector_get_const(&handle_by_ordinal, request->parent_ordinal);
     if (child != Lum_Entity_Null && parent != Lum_Entity_Null) {
       lum_scene_set_parent(ecs, child, parent);
+      loadstat_links++;
     }
   }
+
+  fprintf(stderr, "scene_io: loaded %u entities, %u components, %u links from %s\n",
+          loadstat_entities, loadstat_components, loadstat_links, "scene file");
+  fflush(stderr);
 
   lum_vector_destroy(&handle_by_ordinal);
   lum_vector_destroy(&link_requests);

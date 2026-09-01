@@ -25,7 +25,8 @@ enum {
   lum_Component_hierarchy_id  = 1,
   lum_Component_sprite_id     = 2,
   lum_Component_script_id     = 3,
-  lum_Component_builtin_count = 4
+  lum_Component_name_id       = 4,
+  lum_Component_builtin_count = 5
 };
 
 /* 位置与变换。local 字段由用户写；world 每帧由管线覆盖，只读。
@@ -53,8 +54,21 @@ typedef struct lum_Component_sprite {
   bool     flip_x, flip_y;
 } lum_Component_sprite;
 
+/* 实体名：编辑器大纲树、属性面板标题、调试显示的唯一依据。
+   定长缓冲，set 超长截断；序列化随场景存档往返 */
+#define Lum_Scene_Name_Max 64
+typedef struct lum_Component_name {
+  char text[Lum_Scene_Name_Max];
+} lum_Component_name;
+
 typedef void (*lum_entity_start_fn) (lum_Ecs* ecs, lum_Entity e);
 typedef void (*lum_entity_update_fn)(lum_Ecs* ecs, lum_Entity e, float dt);
+
+/* 脚本名注册表：名字 → 回调对。序列化按名恢复 script（函数指针不可落盘）；
+   user_data 不参与序列化（恢复后为 NULL），需状态的脚本自行按实体重建 */
+void lum_scene_register_script(const char* name, lum_entity_start_fn start, lum_entity_update_fn update);
+const char* lum_scene_script_name(lum_entity_start_fn start, lum_entity_update_fn update);
+bool lum_scene_script_lookup(const char* name, lum_entity_start_fn* out_start, lum_entity_update_fn* out_update);
 
 /* 行为挂在个别实体上（群体行为写系统更合适）。user_data 放长命内存，勿放组件指针 */
 typedef struct lum_Component_script {
@@ -82,6 +96,11 @@ lum_Component_sprite*    lum_scene_add_sprite(lum_Ecs* ecs, lum_Entity e, const 
 lum_Component_script*    lum_scene_add_script(lum_Ecs* ecs, lum_Entity e,
                                        lum_entity_start_fn start, lum_entity_update_fn update, void* user_data);
 
+/* 实体名：add 拷贝 name（NULL 视为空名）；set 为 add-or-update；get 无组件返回 NULL */
+lum_Component_name* lum_scene_add_name(lum_Ecs* ecs, lum_Entity e, const char* name);
+void                lum_scene_set_name(lum_Ecs* ecs, lum_Entity e, const char* name);
+const char*         lum_scene_name(const lum_Ecs* ecs, lum_Entity e);
+
 /* 层级：set_parent 自动维护 hierarchy 组件与孩子链，沿祖先链查环。
    parent 传 LUM_ENTITY_NULL 即摘除为根实体 */
 void       lum_scene_set_parent(lum_Ecs* ecs, lum_Entity child, lum_Entity parent);
@@ -92,6 +111,12 @@ uint32_t   lum_scene_child_count(const lum_Ecs* ecs, lum_Entity e);
 
 /* 级联销毁整棵子树并解链。层级实体请用本函数而非 lum_ecs_destroy_entity */
 void lum_scene_destroy_entity(lum_Ecs* ecs, lum_Entity e);
+
+/* 拾取查询：返回 world_point 落在实体 AABB 内的最上层（sprite layer 最大，平局取后建者）；
+   无命中返回 Lum_Entity_Null。只统计 transform+sprite 实体（无 sprite 不可拾取）；
+   AABB = world 平移 ± sprite.size × 层级缩放（取 world 矩阵列向量长度，忽略旋转）。
+   world 矩阵是派生数据：需先跑过 lum_scene_update（编辑器在帧管线后调用即安全） */
+lum_Entity lum_scene_pick(const lum_Ecs* ecs, lum_Vec2 world_point);
 
 void lum_scene_update(lum_Ecs* ecs, float dt);
 void lum_scene_render(lum_Ecs* ecs);

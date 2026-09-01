@@ -4,6 +4,7 @@
 #include "containers/lum_vector.h"
 #include "lum_assert.h"
 #include "lum_log.h"
+#include <math.h>
 #include <string.h>
 
 typedef struct lum_Render_system_entry {
@@ -16,9 +17,16 @@ typedef struct lum_Update_system_entry {
   void* user_data;
 } lum_Update_system_entry;
 
-/* 系统/渲染注册表：单例（引擎默认单世界）；lum_scene_init 时初始化/重置 */
+typedef struct lum_Script_entry {
+  const char* name;
+  lum_entity_start_fn start;
+  lum_entity_update_fn update;
+} lum_Script_entry;
+
+/* 系统/渲染/脚本注册表：单例（引擎默认单世界）；lum_scene_init 时初始化/重置 */
 static lum_Vector g_render_systems;
 static lum_Vector g_update_systems;
+static lum_Vector g_scripts;
 
 int lum_scene_init(lum_Ecs* ecs) {
   if (!ecs) return 0;
@@ -26,7 +34,8 @@ int lum_scene_init(lum_Ecs* ecs) {
   if (lum_ecs_register_component(ecs, "transform",  sizeof(lum_Component_transform))  != lum_Component_transform_id ||
       lum_ecs_register_component(ecs, "hierarchy",  sizeof(lum_Component_hierarchy))  != lum_Component_hierarchy_id ||
       lum_ecs_register_component(ecs, "sprite",     sizeof(lum_Component_sprite))     != lum_Component_sprite_id ||
-      lum_ecs_register_component(ecs, "script",     sizeof(lum_Component_script))     != lum_Component_script_id) {
+      lum_ecs_register_component(ecs, "script",     sizeof(lum_Component_script))     != lum_Component_script_id ||
+      lum_ecs_register_component(ecs, "name",       sizeof(lum_Component_name))       != lum_Component_name_id) {
     Lum_Log_Error("scene: builtin component registration failed.");
     return 0;
   }
@@ -41,7 +50,56 @@ int lum_scene_init(lum_Ecs* ecs) {
   } else {
     lum_vector_clear(&g_update_systems);
   }
+  if (g_scripts.elem_size == 0) {
+    if (!lum_vector_init(&g_scripts, sizeof(lum_Script_entry))) return 0;
+  } else {
+    lum_vector_clear(&g_scripts);
+  }
   return 1;
+}
+
+void lum_scene_register_script(const char* name, lum_entity_start_fn start, lum_entity_update_fn update) {
+  if (!name || (!start && !update)) return;
+  if (g_scripts.elem_size == 0) {
+    if (!lum_vector_init(&g_scripts, sizeof(lum_Script_entry))) return;
+  }
+  /* 同名重注册：覆盖回调 */
+  for (uint32_t i = 0; i < lum_vector_size(&g_scripts); ++i) {
+    lum_Script_entry* entry = (lum_Script_entry*)lum_vector_get(&g_scripts, i);
+    if (strcmp(entry->name, name) == 0) {
+      entry->start = start;
+      entry->update = update;
+      return;
+    }
+  }
+  lum_Script_entry* entry = (lum_Script_entry*)lum_vector_emplace(&g_scripts);
+  if (!entry) return;
+  entry->name = name;   /* 非拥有：调用方传字符串字面量或长命内存 */
+  entry->start = start;
+  entry->update = update;
+}
+
+const char* lum_scene_script_name(lum_entity_start_fn start, lum_entity_update_fn update) {
+  for (uint32_t i = 0; i < lum_vector_size(&g_scripts); ++i) {
+    const lum_Script_entry* entry = (const lum_Script_entry*)lum_vector_get_const(&g_scripts, i);
+    if (entry->start == start && entry->update == update) return entry->name;
+  }
+  return NULL;
+}
+
+bool lum_scene_script_lookup(const char* name, lum_entity_start_fn* out_start, lum_entity_update_fn* out_update) {
+  if (out_start) *out_start = NULL;
+  if (out_update) *out_update = NULL;
+  if (!name) return false;
+  for (uint32_t i = 0; i < lum_vector_size(&g_scripts); ++i) {
+    const lum_Script_entry* entry = (const lum_Script_entry*)lum_vector_get_const(&g_scripts, i);
+    if (strcmp(entry->name, name) == 0) {
+      if (out_start) *out_start = entry->start;
+      if (out_update) *out_update = entry->update;
+      return true;
+    }
+  }
+  return false;
 }
 
 int lum_scene_add_render_system(lum_Ecs* ecs, lum_render_system_fn fn, void* user_data) {
@@ -89,6 +147,34 @@ lum_Component_script* lum_scene_add_script(lum_Ecs* ecs, lum_Entity e,
   script->update = update;
   script->user_data = user_data;
   return script;
+}
+
+/* ---------- 实体名 ---------- */
+
+static void lum__scene_name_copy(lum_Component_name* name, const char* text) {
+  if (!text) text = "";
+  size_t length = strlen(text);
+  if (length >= Lum_Scene_Name_Max) length = Lum_Scene_Name_Max - 1;   /* 截断，保 NUL */
+  memcpy(name->text, text, length);
+  name->text[length] = '\0';
+}
+
+lum_Component_name* lum_scene_add_name(lum_Ecs* ecs, lum_Entity e, const char* name) {
+  lum_Component_name* component = (lum_Component_name*)lum_ecs_add(ecs, e, lum_Component_name_id);
+  if (!component) return NULL;
+  lum__scene_name_copy(component, name);
+  return component;
+}
+
+void lum_scene_set_name(lum_Ecs* ecs, lum_Entity e, const char* name) {
+  lum_Component_name* component = (lum_Component_name*)lum_ecs_get(ecs, e, lum_Component_name_id);
+  if (!component) component = lum_scene_add_name(ecs, e, name);
+  else lum__scene_name_copy(component, name);
+}
+
+const char* lum_scene_name(const lum_Ecs* ecs, lum_Entity e) {
+  const lum_Component_name* component = (const lum_Component_name*)lum_ecs_get(ecs, e, lum_Component_name_id);
+  return component ? component->text : NULL;
 }
 
 /* ---------- 层级 ---------- */
@@ -196,6 +282,34 @@ void lum_scene_destroy_entity(lum_Ecs* ecs, lum_Entity e) {
     lum_scene_destroy_entity(ecs, next_child);
     next_child = next;
   }
+}
+
+/* ---------- 拾取 ---------- */
+
+lum_Entity lum_scene_pick(const lum_Ecs* ecs, lum_Vec2 world_point) {
+  if (!ecs) return Lum_Entity_Null;
+
+  lum_Entity best = Lum_Entity_Null;
+  int32_t best_layer = 0;
+
+  lum_Ecs_view v = lum_ecs_view_create2((lum_Ecs*)ecs, lum_Component_transform_id, lum_Component_sprite_id);
+  lum_Component_transform* t; lum_Component_sprite* sp; lum_Entity e;
+  while ((e = lum_ecs_view_each2(&v, (void**)&t, (void**)&sp)) != Lum_Entity_Null) {
+    /* world 列向量长度 = 层级缩放（列主序：列0 = m[0..1]，列1 = m[4..5]）；
+       平移 = m[12..13]。旋转不进 AABB——带旋转实体的框按未旋转包住自身尺寸 */
+    float scale_x = sqrtf(t->world.m[0] * t->world.m[0] + t->world.m[1] * t->world.m[1]);
+    float scale_y = sqrtf(t->world.m[4] * t->world.m[4] + t->world.m[5] * t->world.m[5]);
+    float half_w = sp->size.x * scale_x * 0.5f;
+    float half_h = sp->size.y * scale_y * 0.5f;
+    float cx = t->world.m[12], cy = t->world.m[13];
+
+    if (world_point.x < cx - half_w || world_point.x > cx + half_w ||
+        world_point.y < cy - half_h || world_point.y > cy + half_h) continue;
+    if (best != Lum_Entity_Null && sp->layer < best_layer) continue;   /* 平局后到者胜：dense 序靠后 = 绘制在上 */
+    best = e;
+    best_layer = sp->layer;
+  }
+  return best;
 }
 
 /* ---------- 系统与管线 ---------- */

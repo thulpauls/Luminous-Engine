@@ -37,6 +37,7 @@ void lum_renderer2d_clear(void);
 
 void lum_renderer2d_set_camera(const lum_Camera2d* camera);
 void lum_renderer2d_set_view_projection(lum_Mat4 view_proj);
+lum_Mat4 lum_renderer2d_view_projection(void);   /* 当前帧投影读取（UI/子系统暂存还原用） */
 
 typedef enum lum_Blend_mode {
   Lum_Blend_None     = 0,
@@ -46,6 +47,11 @@ typedef enum lum_Blend_mode {
 } lum_Blend_mode;
 
 void lum_renderer2d_set_blend_mode(lum_Blend_mode mode);
+
+/* 剪裁：后续 draw 命令按渲染目标像素矩形（左下原点）丢弃片元，clear 成对退出。
+   命令级快照（同 view_projection/blend）：不同剪裁的命令不入同批，flush 时切换 GL 状态 */
+void lum_renderer2d_set_scissor(int x, int y, int w, int h);
+void lum_renderer2d_clear_scissor(void);
 
 void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]);
 

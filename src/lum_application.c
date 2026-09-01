@@ -4,6 +4,7 @@
 #include "lum_time.h"
 #include "lum_renderer2d.h"
 #include "lum_scene.h"
+#include "lum_scene_io.h"
 #include "lum_assets.h"
 #include "effects/lum_effects.h"
 #include <string.h>
@@ -59,6 +60,10 @@ static int lum__app_init_subsystems(const lum_App_desc* desc) {
     if (!g_application.ecs || !lum_scene_init(g_application.ecs)) {
         Lum_Log_Fatal("app: ecs/scene init failed.");
         goto failure_effects;
+    }
+    if (!lum_scene_io_init(g_application.ecs)) {
+        Lum_Log_Fatal("app: scene io init failed.");
+        goto failure_ecs;
     }
 
     if (!lum_assets_init()) {
