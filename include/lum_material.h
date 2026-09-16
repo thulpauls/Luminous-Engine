@@ -48,7 +48,7 @@ void lum_material_destroy(lum_Material* material);
 void lum_material_set_texture(lum_Material* material, uint32_t slot, const lum_Texture2d* texture);
 void lum_material_set_shader(lum_Material* material, const lum_Shader* shader);
 
-int lum_material_remove_parameter(lum_Material* lum_Material, const char* name);
+int lum_material_remove_parameter(lum_Material* material, const char* name);
 
 int lum_material_set_parameter_1i(lum_Material* material, const char* name, int value);
 int lum_material_set_parameter_1f(lum_Material* material, const char* name, float value);

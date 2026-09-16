@@ -7,7 +7,8 @@
 * 内置扩展组件：光晕/光环实体。ECS 数据 + 配套渲染系统 + 字段表序列化三件套。
 * 用法：lum_components_register(ecs) 一次注册后，
 *   lum_component_glow_add 创建（默认值）→ 挂 transform、改字段 →
-*   lum_scene_add_render_system(ecs, lum_component_glow_render_system, NULL) 参与绘制。
+*   lum_scene_add_render_system 已删除；改用
+*   lum_app_add_system(Lum_Stage_Scene, 0, lum_component_glow_render_system, NULL) 参与绘制。
 */
 
 typedef struct lum_Component_glow {
@@ -29,7 +30,7 @@ lum_Component_type lum_component_glow_type(void);
 /* 便捷添加：填入与字段表一致的默认值 */
 lum_Component_glow* lum_component_glow_add(lum_Ecs* ecs, lum_Entity e);
 
-/* 渲染系统（lum_scene_add_render_system 用）：additive 混合，渲染中心 = world 平移 */
-void lum_component_glow_render_system(lum_Ecs* ecs, void* user_data);
+/* 渲染系统（挂到 Lum_Stage_Scene 用）：additive 混合，渲染中心 = world 平移 */
+void lum_component_glow_render_system(lum_Ecs* ecs, lum_Context* ctx, void* user_data);
 
 #endif //Lum_Component_Glow_H

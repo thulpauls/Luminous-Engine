@@ -40,6 +40,7 @@ static int sprite_write(const void* component, lum_Archive* archive) {
   lum_serial_w_vec4(archive, "uv", sprite->uv);
   lum_serial_w_vec4(archive, "color", sprite->color);
   lum_serial_w_i32(archive, "layer", sprite->layer);
+  lum_serial_w_u32(archive, "category", sprite->category);
   lum_serial_w_bool(archive, "flip_x", sprite->flip_x);
   lum_serial_w_bool(archive, "flip_y", sprite->flip_y);
   return 1;
@@ -59,6 +60,7 @@ static int sprite_read(void* component, lum_Archive* archive) {
   lum_serial_r_vec4(archive, "uv",     lum_vec4_create(0.0f, 0.0f, 1.0f, 1.0f), &sprite->uv);
   lum_serial_r_vec4(archive, "color",  lum_vec4_create(1.0f, 1.0f, 1.0f, 1.0f), &sprite->color);
   lum_serial_r_i32 (archive, "layer",  0, &sprite->layer);
+  lum_serial_r_u32 (archive, "category", Lum_Sprite_Category_Default, &sprite->category);
   lum_serial_r_bool(archive, "flip_x", false, &sprite->flip_x);
   lum_serial_r_bool(archive, "flip_y", false, &sprite->flip_y);
   return 1;

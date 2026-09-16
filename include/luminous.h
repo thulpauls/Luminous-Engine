@@ -4,9 +4,11 @@
 #include "lum_application.h"
 
 /* --- 基础层 --- */
+#include "lum_version.h"
 #include "lum_log.h"
 #include "lum_assert.h"
 #include "lum_math2d.h"
+#include "lum_collision.h"
 #include "containers/lum_vector.h"
 #include "containers/lum_list.h"
 

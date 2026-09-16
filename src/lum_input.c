@@ -40,6 +40,7 @@ static void lum__input_char_callback(GLFWwindow* window, unsigned int codepoint)
 }
 
 static void lum__input_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+  (void)window;
   g_input.scroll_acc.x += (float)xoffset;
   g_input.scroll_acc.y += (float)yoffset;
 }
@@ -65,6 +66,10 @@ int lum_input_init(void) {
 void lum_input_shutdown(void) {
   if (!g_input.initialized) return;
   lum__input_reset();
+}
+
+bool lum_input_is_initialized(void) {
+  return g_input.initialized;
 }
 
 void lum_input_update(void) {

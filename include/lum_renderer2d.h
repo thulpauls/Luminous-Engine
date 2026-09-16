@@ -29,6 +29,7 @@ int lum_renderer2d_init(uint32_t viewport_w, uint32_t viewport_h);
 void lum_renderer2d_shutdown(void);
 
 void lum_renderer2d_set_viewport(int x, int y, int w, int h);
+void lum_renderer2d_get_viewport(int* x, int* y, int* w, int* h);   /* 读当前视口（视图"全屏"解析用） */
 void lum_renderer2d_set_clear_color(lum_Vec4 color);
 
 void lum_renderer2d_begin_frame(void);
@@ -53,7 +54,11 @@ void lum_renderer2d_set_blend_mode(lum_Blend_mode mode);
 void lum_renderer2d_set_scissor(int x, int y, int w, int h);
 void lum_renderer2d_clear_scissor(void);
 
-void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]);
+/* 区域清屏：glClear 只受 scissor 限制、不受 viewport 限制，所以要把多个视图清进各自矩形
+   必须走这条。内部临时开关 GL scissor，不影响命令级剪裁状态（set_scissor 的记录值）。 */
+void lum_renderer2d_clear_region(int x, int y, int w, int h, lum_Vec4 color);
+
+void lum_renderer2d_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]);
 
 void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count, const uint32_t* indices, uint32_t index_count, lum_Primitive primitive, const lum_Material* material, const lum_Texture2d* texture, int32_t layer);
 void lum_renderer2d_draw_fullscreen(const lum_Material* material, const lum_Texture2d* src, int32_t layer);
@@ -61,7 +66,7 @@ void lum_renderer2d_draw_fullscreen(const lum_Material* material, const lum_Text
 void lum_renderer2d_draw_sprite(const lum_Texture2d* texture, const lum_Transform2d* transform, int32_t layer, lum_Vec4 color);
 void lum_renderer2d_draw_sprite_uv(const lum_Texture2d* texture, lum_Vec2 position, lum_Vec2 size, lum_Vec4 uv_rect, int32_t layer, lum_Vec4 color);
 
-/* 直接用世界矩阵绘制 sprite 子矩形（场景层级渲染用），model 语义同 lum_build_quad */
+/* 直接用世界矩阵绘制 sprite 子矩形（场景层级渲染用），model 语义同 lum_renderer2d_build_quad */
 void lum_renderer2d_draw_sprite_matrix_uv(const lum_Texture2d* texture, lum_Mat4 model,
                                                  lum_Vec4 uv_rect, int32_t layer, lum_Vec4 color);
 

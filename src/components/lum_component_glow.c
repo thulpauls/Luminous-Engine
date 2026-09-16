@@ -56,7 +56,8 @@ lum_Component_glow* lum_component_glow_add(lum_Ecs* ecs, lum_Entity e) {
   return glow;
 }
 
-void lum_component_glow_render_system(lum_Ecs* ecs, void* user_data) {
+void lum_component_glow_render_system(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)ctx;
   (void)user_data;
   if (g_glow_type == Lum_Component_Invalid) return;
   lum_renderer2d_set_blend_mode(Lum_Blend_Additive);

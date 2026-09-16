@@ -70,7 +70,7 @@ void lum_material_set_shader(lum_Material* material, const lum_Shader* shader) {
     material->shader = shader;
 }
 
-int lum_material_remove_param(lum_Material* material, const char* name) {
+int lum_material_remove_parameter(lum_Material* material, const char* name) {
     Lum_Assert(material && name);
     if (!material->initialized) return 0;
     

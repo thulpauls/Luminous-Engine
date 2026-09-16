@@ -302,6 +302,24 @@ void lum_renderer2d_set_viewport(int x, int y, int w, int h) {
   glViewport(x, y, w, h);
 }
 
+void lum_renderer2d_get_viewport(int* x, int* y, int* w, int* h) {
+  if (x) *x = g_renderer2d.initialized ? (int)g_renderer2d.viewport_x : 0;
+  if (y) *y = g_renderer2d.initialized ? (int)g_renderer2d.viewport_y : 0;
+  if (w) *w = g_renderer2d.initialized ? (int)g_renderer2d.viewport_w : 0;
+  if (h) *h = g_renderer2d.initialized ? (int)g_renderer2d.viewport_h : 0;
+}
+
+void lum_renderer2d_clear_region(int x, int y, int w, int h, lum_Vec4 color) {
+  if (!g_renderer2d.initialized) return;
+  if (w <= 0 || h <= 0) return;
+
+  glEnable(GL_SCISSOR_TEST);
+  glScissor(x, y, w, h);
+  glClearColor(color.x, color.y, color.z, color.w);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glDisable(GL_SCISSOR_TEST);
+}
+
 void lum_renderer2d_set_clear_color(lum_Vec4 color) {
   if (!g_renderer2d.initialized) return;
   g_renderer2d.clear_color = color;
@@ -550,8 +568,88 @@ static void lum__build_quad_uv(lum_Mat4 model, lum_Vec4 uv_rect, lum_Vec4 color,
   }
 }
 
-void lum_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]) {
+void lum_renderer2d_build_quad(lum_Mat4 model, lum_Vec4 color, lum_Vertex out_verts[4]) {
   lum__build_quad_uv(model, lum_vec4_create(0.0f, 0.0f, 1.0f, 1.0f), color, out_verts);
+}
+
+static uint32_t lum__idx_at(const uint32_t* indices, uint32_t i) {
+  return indices ? indices[i] : i;   /* indices == NULL：隐式索引即顶点序号 */
+}
+
+static lum_Primitive lum__normalized_primitive(lum_Primitive p) {
+  switch (p) {
+    case Lum_Primitive_Triangle_Fan:
+    case Lum_Primitive_Triangle_Strip: return Lum_Primitive_Triangles;
+    case Lum_Primitive_Line_Strip:
+    case Lum_Primitive_Line_Loop:      return Lum_Primitive_Lines;
+    default:                           return p;
+  }
+}
+
+/* 展开为显式索引。out == NULL 时只计数（dry run），保证计数与写出共用同一份逻辑。
+ * 返回展开后的索引数；0 表示顶点不足以构成一个图元。 */
+static uint32_t lum__expand_indices(lum_Primitive primitive, const uint32_t* indices, uint32_t src_count, uint32_t* out) {
+  uint32_t n = 0;
+
+  switch (primitive) {
+    case Lum_Primitive_Triangle_Fan:            /* hub = 第 0 位，向后续顶点扇形展开 */
+      if (src_count < 3u) return 0u;
+      for (uint32_t i = 1u; i + 1u < src_count; ++i) {
+        if (out) {
+          out[n]      = lum__idx_at(indices, 0u);
+          out[n + 1u] = lum__idx_at(indices, i);
+          out[n + 2u] = lum__idx_at(indices, i + 1u);
+        }
+        n += 3u;
+      }
+      return n;
+
+    case Lum_Primitive_Triangle_Strip:
+      if (src_count < 3u) return 0u;
+      for (uint32_t i = 0u; i + 2u < src_count; ++i) {
+        if (out) {
+          /* 原 strip 每个三角形交替绕向，展开时保持一致 */
+          if ((i & 1u) == 0u) {
+            out[n]      = lum__idx_at(indices, i);
+            out[n + 1u] = lum__idx_at(indices, i + 1u);
+          } else {
+            out[n]      = lum__idx_at(indices, i + 1u);
+            out[n + 1u] = lum__idx_at(indices, i);
+          }
+          out[n + 2u] = lum__idx_at(indices, i + 2u);
+        }
+        n += 3u;
+      }
+      return n;
+
+    case Lum_Primitive_Line_Strip:
+      if (src_count < 2u) return 0u;
+      for (uint32_t i = 0u; i + 1u < src_count; ++i) {
+        if (out) {
+          out[n]      = lum__idx_at(indices, i);
+          out[n + 1u] = lum__idx_at(indices, i + 1u);
+        }
+        n += 2u;
+      }
+      return n;
+
+    case Lum_Primitive_Line_Loop:
+      if (src_count < 2u) return 0u;
+      for (uint32_t i = 0u; i < src_count; ++i) {
+        if (out) {
+          out[n]      = lum__idx_at(indices, i);
+          out[n + 1u] = lum__idx_at(indices, (i + 1u) % src_count);
+        }
+        n += 2u;
+      }
+      return n;
+
+    default:   /* Triangles / Lines / Points：索引即拓扑，原样保留 */
+      for (uint32_t i = 0u; i < src_count; ++i) {
+        if (out) out[i] = lum__idx_at(indices, i);
+      }
+      return src_count;
+  }
 }
 
 void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count, const uint32_t* indices, uint32_t index_count, lum_Primitive primitive, const lum_Material* material, const lum_Texture2d* texture, int32_t layer) {
@@ -560,13 +658,13 @@ void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count,
   if (!material->shader || !material->shader->initialized) return;
   if (!vertices || vertex_count == 0) return;
 
-  uint32_t gen_count;
-  if (indices) {
-    if (index_count == 0) return;
-    gen_count = index_count;
-  } else {
-    gen_count = vertex_count;
-  }
+  /* 源索引数：显式索引按下标个数，隐式索引按顶点个数 */
+  uint32_t src_count = indices ? index_count : vertex_count;
+  if (src_count == 0u) return;
+
+  /* 位置型图元在此展开成显式索引；gen_count 是展开后的索引数 */
+  uint32_t gen_count = lum__expand_indices(primitive, indices, src_count, NULL);
+  if (gen_count == 0u) return;
 
   if (!lum__arena_ensure_vertices(vertex_count)) return;
   if (!lum__arena_ensure_indices(gen_count)) return;
@@ -579,19 +677,13 @@ void lum_renderer2d_draw_mesh(const lum_Vertex* vertices, uint32_t vertex_count,
   g_renderer2d.frame_vertex_count += vertex_count;
 
   uint32_t ioff = g_renderer2d.frame_index_count;
-  if (indices) {
-    memcpy(g_renderer2d.frame_indices + ioff, indices, sizeof(uint32_t) * index_count);
-    g_renderer2d.frame_index_count += index_count;
-  } else {
-    for (uint32_t i = 0; i < vertex_count; ++i) {
-      g_renderer2d.frame_indices[g_renderer2d.frame_index_count++] = i;
-    }
-  }
+  lum__expand_indices(primitive, indices, src_count, g_renderer2d.frame_indices + ioff);
+  g_renderer2d.frame_index_count += gen_count;
 
   lum_Mesh_command* cmd = &g_renderer2d.mesh_commands[g_renderer2d.mesh_command_count++];
   cmd->material = material;
   cmd->texture = eff_texture;
-  cmd->primitive = primitive;
+  cmd->primitive = lum__normalized_primitive(primitive);
   cmd->blend = g_renderer2d.current_blend_mode;
   cmd->layer = layer;
   cmd->sequence = g_renderer2d.mesh_next_sequence++;
@@ -639,7 +731,7 @@ void lum_renderer2d_draw_sprite(const lum_Texture2d* texture, const lum_Transfor
   if (!g_renderer2d.initialized) return;
   lum_Mat4 model = lum_transform2d_get_matrix(transform);
   lum_Vertex v[4];
-  lum_build_quad(model, color, v);
+  lum_renderer2d_build_quad(model, color, v);
   lum_renderer2d_draw_mesh(v, 4, lum_quad_indices, 6, Lum_Primitive_Triangles, &g_renderer2d.sprite_material, texture, layer);
 }
 
@@ -693,7 +785,7 @@ void lum_renderer2d_draw_circle(lum_Vec2 position, float radius, int32_t layer, 
   lum_Transform2d t = lum_transform2d_create(position, size, lum_vec2_1(), 0.0f, lum_vec2_scale(size, 0.5f));
   lum_Mat4 model = lum_transform2d_get_matrix(&t);
   lum_Vertex v[4];
-  lum_build_quad(model, color, v);
+  lum_renderer2d_build_quad(model, color, v);
   static const uint32_t lum_quad_indices[6] = { 0, 1, 2, 2, 3, 0 };
   lum_renderer2d_draw_mesh(v, 4, lum_quad_indices, 6, Lum_Primitive_Triangles, &g_renderer2d.circle_material, NULL, layer);
 }

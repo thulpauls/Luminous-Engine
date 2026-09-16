@@ -22,12 +22,14 @@ static void lum__window_reset(void) {
 }
 
 static void lum__window_framebuffer_size_callback(GLFWwindow* window, int w, int h) {
+  (void)window;
   g_window.framebuffer_width = (uint32_t)w;
   g_window.framebuffer_height = (uint32_t)h;
   glViewport(0, 0, w, h);
 }
 
 static void lum__window_size_callback(GLFWwindow* window, int w, int h) {
+  (void)window;
   g_window.width = (uint32_t)w;
   g_window.height = (uint32_t)h;
 }
@@ -66,8 +68,13 @@ int lum_window_init(const char* title, uint32_t w, uint32_t h) {
   g_window.handle = handle;
   g_window.initialized = true;
 
-  glfwGetWindowSize(handle, &g_window.width, &g_window.height);
-  glfwGetFramebufferSize(handle, &g_window.framebuffer_width, &g_window.framebuffer_height);
+  int win_w = 0, win_h = 0, fb_w = 0, fb_h = 0;
+  glfwGetWindowSize(handle, &win_w, &win_h);
+  glfwGetFramebufferSize(handle, &fb_w, &fb_h);
+  g_window.width = (uint32_t)win_w;
+  g_window.height = (uint32_t)win_h;
+  g_window.framebuffer_width = (uint32_t)fb_w;
+  g_window.framebuffer_height = (uint32_t)fb_h;
   glViewport(0, 0, g_window.framebuffer_width, g_window.framebuffer_height);
   
   return 1;

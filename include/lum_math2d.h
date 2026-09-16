@@ -74,7 +74,7 @@ float lum_vec3_len_square(lum_Vec3 v);
 float lum_vec3_len(lum_Vec3 v);
 lum_Vec3 lum_vec3_normalise(lum_Vec3 v);
 int lum_vec3_eq(lum_Vec3 a, lum_Vec3 b);
-lum_Vec3 lum_vec2_to_vec4(lum_Vec2 v);
+lum_Vec4 lum_vec3_to_vec4(lum_Vec3 v);
 
 lum_Vec4 lum_vec4_create(float x, float y, float z, float w);
 lum_Vec4 lum_vec4_0(void);

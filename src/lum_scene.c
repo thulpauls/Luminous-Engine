@@ -1,21 +1,13 @@
 #include "lum_scene.h"
+#include "lum_application.h"   /* lum_Context / lum_Stage / lum_app_add_system */
 #include "lum_transform.h"
 #include "lum_renderer2d.h"
+#include "lum_render_target.h"
 #include "containers/lum_vector.h"
 #include "lum_assert.h"
 #include "lum_log.h"
 #include <math.h>
 #include <string.h>
-
-typedef struct lum_Render_system_entry {
-  lum_render_system_fn fn;
-  void* user_data;
-} lum_Render_system_entry;
-
-typedef struct lum_Update_system_entry {
-  lum_update_system_fn fn;
-  void* user_data;
-} lum_Update_system_entry;
 
 typedef struct lum_Script_entry {
   const char* name;
@@ -23,32 +15,58 @@ typedef struct lum_Script_entry {
   lum_entity_update_fn update;
 } lum_Script_entry;
 
-/* 系统/渲染/脚本注册表：单例（引擎默认单世界）；lum_scene_init 时初始化/重置 */
-static lum_Vector g_render_systems;
-static lum_Vector g_update_systems;
+/* 视图与脚本注册表：单例（引擎默认单世界）；lum_scene_init 时初始化/重置。
+   视图表按 priority 有序，执行时纯遍历（注册低频、执行每帧）。 */
+static lum_Vector g_views;        /* lum_View */
 static lum_Vector g_scripts;
+
+/* 引擎内置系统（前向声明） */
+static void lum__sys_script    (lum_Ecs* ecs, lum_Context* ctx, void* user_data);
+static void lum__sys_transform (lum_Ecs* ecs, lum_Context* ctx, void* user_data);
+static void lum__sys_commit    (lum_Ecs* ecs, lum_Context* ctx, void* user_data);
+static void lum__sys_view_begin(lum_Ecs* ecs, lum_Context* ctx, void* user_data);
+static void lum__sys_sprite    (lum_Ecs* ecs, lum_Context* ctx, void* user_data);
+
+static int lum__views_insert(lum_View view) {
+  uint32_t n = lum_vector_size(&g_views);
+  uint32_t pos = n;
+  for (uint32_t i = 0; i < n; ++i) {
+    const lum_View* it = (const lum_View*)lum_vector_get_const(&g_views, i);
+    if (it->priority > view.priority) { pos = i; break; }
+  }
+  if (!lum_vector_reserve(&g_views, n + 1u)) return 0;
+
+  unsigned char* base = g_views.data;
+  if (pos < n) {
+    memmove(base + (size_t)(pos + 1u) * sizeof(lum_View),
+            base + (size_t)pos * sizeof(lum_View),
+            (size_t)(n - pos) * sizeof(lum_View));
+  }
+  *(lum_View*)(base + (size_t)pos * sizeof(lum_View)) = view;
+  g_views.size = n + 1u;
+  return 1;
+}
 
 int lum_scene_init(lum_Ecs* ecs) {
   if (!ecs) return 0;
-  /* 注册顺序必须与 lum_scene.h 的 id 枚举一致 */
-  if (lum_ecs_register_component(ecs, "transform",  sizeof(lum_Component_transform))  != lum_Component_transform_id ||
-      lum_ecs_register_component(ecs, "hierarchy",  sizeof(lum_Component_hierarchy))  != lum_Component_hierarchy_id ||
-      lum_ecs_register_component(ecs, "sprite",     sizeof(lum_Component_sprite))     != lum_Component_sprite_id ||
-      lum_ecs_register_component(ecs, "script",     sizeof(lum_Component_script))     != lum_Component_script_id ||
-      lum_ecs_register_component(ecs, "name",       sizeof(lum_Component_name))       != lum_Component_name_id) {
-    Lum_Log_Error("scene: builtin component registration failed.");
-    return 0;
+
+  /* 同一 world 重复 init：组件已注册过就跳过注册（重复注册会新增池并让 id 漂移） */
+  if (lum_ecs_component_type_from_name(ecs, "transform") != lum_Component_transform_id) {
+    /* 注册顺序必须与 lum_scene.h 的 id 枚举一致 */
+    if (lum_ecs_register_component(ecs, "transform",  sizeof(lum_Component_transform))  != lum_Component_transform_id ||
+        lum_ecs_register_component(ecs, "hierarchy",  sizeof(lum_Component_hierarchy))  != lum_Component_hierarchy_id ||
+        lum_ecs_register_component(ecs, "sprite",     sizeof(lum_Component_sprite))     != lum_Component_sprite_id ||
+        lum_ecs_register_component(ecs, "script",     sizeof(lum_Component_script))     != lum_Component_script_id ||
+        lum_ecs_register_component(ecs, "name",       sizeof(lum_Component_name))       != lum_Component_name_id) {
+      Lum_Log_Error("scene: builtin component registration failed.");
+      return 0;
+    }
   }
 
-  if (g_render_systems.elem_size == 0) {
-    if (!lum_vector_init(&g_render_systems, sizeof(lum_Render_system_entry))) return 0;
+  if (g_views.elem_size == 0) {
+    if (!lum_vector_init(&g_views, sizeof(lum_View))) return 0;
   } else {
-    lum_vector_clear(&g_render_systems);   /* 进程内重复 init 时重置注册表 */
-  }
-  if (g_update_systems.elem_size == 0) {
-    if (!lum_vector_init(&g_update_systems, sizeof(lum_Update_system_entry))) return 0;
-  } else {
-    lum_vector_clear(&g_update_systems);
+    lum_vector_clear(&g_views);
   }
   if (g_scripts.elem_size == 0) {
     if (!lum_vector_init(&g_scripts, sizeof(lum_Script_entry))) return 0;
@@ -56,6 +74,15 @@ int lum_scene_init(lum_Ecs* ecs) {
     lum_vector_clear(&g_scripts);
   }
   return 1;
+}
+
+/* 把场景层的引擎系统挂进阶段状态机。由 lum_application 的流程初始化调用一次 */
+void lum_scene_register_engine_systems(void) {
+  lum_flow_add_engine_system(Lum_Stage_Pre,          -1000, lum__sys_script,     NULL);
+  lum_flow_add_engine_system(Lum_Stage_Transform,        0, lum__sys_transform,  NULL);
+  lum_flow_add_engine_system(Lum_Stage_Commit,           0, lum__sys_commit,     NULL);
+  lum_flow_add_engine_system(Lum_Stage_View_Begin,       0, lum__sys_view_begin, NULL);
+  lum_flow_add_engine_system(Lum_Stage_Scene,        -1000, lum__sys_sprite,     NULL);
 }
 
 void lum_scene_register_script(const char* name, lum_entity_start_fn start, lum_entity_update_fn update) {
@@ -102,22 +129,37 @@ bool lum_scene_script_lookup(const char* name, lum_entity_start_fn* out_start, l
   return false;
 }
 
-int lum_scene_add_render_system(lum_Ecs* ecs, lum_render_system_fn fn, void* user_data) {
-  if (!ecs || !fn || g_render_systems.elem_size == 0) return 0;
-  lum_Render_system_entry* entry = (lum_Render_system_entry*)lum_vector_emplace(&g_render_systems);
-  if (!entry) return 0;
-  entry->fn = fn;
-  entry->user_data = user_data;
-  return 1;
+/* ---------- 视图 ---------- */
+
+lum_View lum_view_default(const char* name) {
+  lum_View view;
+  memset(&view, 0, sizeof(view));
+  view.name = name;
+  lum_camera2d_init(&view.camera, 1.0f, 1.0f);   /* 尺寸在渲染时按视口覆盖 */
+  view.category_mask = 0u;                       /* 0 = 不筛选 */
+  view.clear_enabled = false;
+  return view;
 }
 
-int lum_scene_add_update_system(lum_Ecs* ecs, lum_update_system_fn fn, void* user_data) {
-  if (!ecs || !fn || g_update_systems.elem_size == 0) return 0;
-  lum_Update_system_entry* entry = (lum_Update_system_entry*)lum_vector_emplace(&g_update_systems);
-  if (!entry) return 0;
-  entry->fn = fn;
-  entry->user_data = user_data;
-  return 1;
+int lum_view_add(lum_Ecs* ecs, const lum_View* desc) {
+  if (!ecs || !desc) return 0;
+  if (g_views.elem_size == 0) return 0;
+  return lum__views_insert(*desc);
+}
+
+lum_View* lum_view_get(lum_Ecs* ecs, int index) {
+  if (!ecs || index < 0 || (uint32_t)index >= lum_vector_size(&g_views)) return NULL;
+  return (lum_View*)lum_vector_get(&g_views, (uint32_t)index);
+}
+
+int lum_view_count(const lum_Ecs* ecs) {
+  (void)ecs;
+  return (int)lum_vector_size(&g_views);
+}
+
+void lum_view_clear_all(lum_Ecs* ecs) {
+  (void)ecs;
+  lum_vector_clear(&g_views);
 }
 
 lum_Component_transform* lum_scene_add_transform(lum_Ecs* ecs, lum_Entity e) {
@@ -135,6 +177,7 @@ lum_Component_sprite* lum_scene_add_sprite(lum_Ecs* ecs, lum_Entity e, const lum
   sprite->size = lum_vec2_create(1.0f, 1.0f);
   sprite->uv = lum_vec4_create(0.0f, 0.0f, 1.0f, 1.0f);
   sprite->color = lum_vec4_create(1.0f, 1.0f, 1.0f, 1.0f);
+  sprite->category = Lum_Sprite_Category_Default;
   return sprite;
 }
 
@@ -334,7 +377,8 @@ static void lum__scene_compute_world(lum_Ecs* ecs, lum_Entity e, lum_Mat4 parent
   }
 }
 
-static void lum__sys_script(lum_Ecs* ecs, float dt) {
+static void lum__sys_script(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)user_data;
   /* 先跑完所有 start，再跑 update——新实体的初始化先于任何 update */
   lum_Ecs_view v = lum_ecs_view_create(ecs, lum_Component_script_id);
   lum_Component_script* script; lum_Entity e;
@@ -346,11 +390,16 @@ static void lum__sys_script(lum_Ecs* ecs, float dt) {
   }
   v = lum_ecs_view_create(ecs, lum_Component_script_id);
   while ((e = lum_ecs_view_each(&v, (void**)&script)) != Lum_Entity_Null) {
-    if (script->update) script->update(ecs, e, dt);
+    if (script->update) script->update(ecs, e, ctx->dt);
   }
 }
 
-static void lum__sys_transform(lum_Ecs* ecs) {
+/* ---------- 引擎系统 ---------- */
+
+/* Transform：结构点，local → world（引擎独占阶段） */
+static void lum__sys_transform(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)ctx; (void)user_data;
+
   lum_Ecs_view v = lum_ecs_view_create(ecs, lum_Component_transform_id);
   lum_Component_transform* t; lum_Entity e;
   while ((e = lum_ecs_view_each(&v, (void**)&t)) != Lum_Entity_Null) {
@@ -362,25 +411,24 @@ static void lum__sys_transform(lum_Ecs* ecs) {
   }
 }
 
-void lum_scene_update(lum_Ecs* ecs, float dt) {
-  if (!ecs) return;
-  lum__sys_script(ecs, dt);
-  for (uint32_t i = 0; i < lum_vector_size(&g_update_systems); ++i) {
-    const lum_Update_system_entry* entry =
-        (const lum_Update_system_entry*)lum_vector_get_const(&g_update_systems, i);
-    entry->fn(ecs, dt, entry->user_data);
-  }
-  lum__sys_transform(ecs);
+/* Commit：结构点，回收本帧墓碑（引擎独占阶段） */
+static void lum__sys_commit(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)ctx; (void)user_data;
   lum_ecs_flush(ecs);
 }
 
-/* 内置第一环：sprite 系统（不可移除，用户无需注册） */
-static void lum__render_system_sprites(lum_Ecs* ecs) {
+/* Sprite：Scene 阶段的普通系统（priority -1000，可被用户系统显式排布）。
+   每个视图被调用一次，靠 ctx->view 的分类掩码决定跳过哪些实体 */
+static void lum__sys_sprite(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)user_data;
+  uint32_t mask = (ctx && ctx->view) ? ctx->view->category_mask : 0u;   /* 0 = 不筛选 */
+
   lum_renderer2d_set_blend_mode(Lum_Blend_Alpha);
   lum_Ecs_view v = lum_ecs_view_create2(ecs, lum_Component_transform_id, lum_Component_sprite_id);
   lum_Component_transform* t; lum_Component_sprite* sp; lum_Entity e;
   while ((e = lum_ecs_view_each2(&v, (void**)&t, (void**)&sp)) != Lum_Entity_Null) {
     if (!sp->texture) continue;
+    if (mask != 0u && (sp->category & mask) == 0u) continue;   /* 本视图不看这一类 */
 
     lum_Vec4 uv = sp->uv;
     if (sp->flip_x) { float tmp = uv.x; uv.x = uv.z; uv.z = tmp; }
@@ -393,13 +441,33 @@ static void lum__render_system_sprites(lum_Ecs* ecs) {
   }
 }
 
-void lum_scene_render(lum_Ecs* ecs) {
-  if (!ecs) return;
+/* View_Begin：绑目标 / 视口 / 区域清屏 / 相机 VP（引擎独占阶段，每视图被调用一次） */
+static void lum__sys_view_begin(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)ecs; (void)user_data;
+  const lum_View* view = ctx ? ctx->view : NULL;
+  if (!view) return;
 
-  lum__render_system_sprites(ecs);
-  for (uint32_t i = 0; i < lum_vector_size(&g_render_systems); ++i) {
-    const lum_Render_system_entry* entry =
-        (const lum_Render_system_entry*)lum_vector_get_const(&g_render_systems, i);
-    entry->fn(ecs, entry->user_data);
+  if (view->target && view->target->initialized) lum_rt_bind(view->target);
+  else lum_rt_bind_screen();
+
+  /* 视口：w/h <= 0 表示沿用当前视口（全屏） */
+  int vx = 0, vy = 0, vw = 0, vh = 0;
+  if (view->viewport[2] > 0 && view->viewport[3] > 0) {
+    vx = view->viewport[0]; vy = view->viewport[1];
+    vw = view->viewport[2]; vh = view->viewport[3];
+    lum_renderer2d_set_viewport(vx, vy, vw, vh);
+  } else {
+    lum_renderer2d_get_viewport(&vx, &vy, &vw, &vh);
   }
+
+  /* glClear 只受 scissor 限制、不受 viewport 限制：多视图必须用区域清 */
+  if (view->clear_enabled) {
+    lum_renderer2d_clear_region(vx, vy, vw, vh, view->clear);
+  }
+
+  /* 相机 VP：把相机 viewport 设为视图像素尺寸，使正交投影正好铺满该矩形 */
+  lum_Camera2d cam = view->camera;
+  if (cam.zoom <= 0.0f) cam.zoom = 1.0f;   /* 兜底：未初始化的相机（zoom=0）会算出退化矩阵 */
+  lum_camera2d_set_viewport(&cam, (float)vw, (float)vh);
+  lum_renderer2d_set_view_projection(lum_camera2d_get_view_projection_matrix(&cam));
 }

@@ -1,4 +1,4 @@
-#include "lum_effects.h"
+#include "effects/lum_effects.h"
 #include "lum_log.h"
 #include "lum_assert.h"
 #include <string.h>

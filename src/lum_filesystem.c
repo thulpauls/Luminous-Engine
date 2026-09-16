@@ -46,7 +46,7 @@ static int lum__stat(const char* path, struct stat* st) {
 
 char* lum_fs_read(const char* filename) {
   size_t sz = 0;
-  return lum__read(filename, &sz, true);
+  return (char*)lum__read(filename, &sz, true);
 }
 
 lum_Binary_file lum_fs_read_binary(const char* filename) {
@@ -89,7 +89,7 @@ int lum_fs_write_binary(const char* filename, const unsigned char* data, size_t 
 
 int lum_fs_write(const char* filename, const char* text) {
   Lum_Assert(text);
-  return lum_fs_write_binary(filename, text, strlen(text));
+  return lum_fs_write_binary(filename, (const unsigned char*)text, strlen(text));
 }
 
 bool lum_fs_exists(const char* path) {

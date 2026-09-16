@@ -474,7 +474,7 @@ lum_Entity lum_ecs_view_each3(lum_Ecs_view* v, void** out_a, void** out_b, void*
   const lum_Pool* main_p = v->pools[v->primary];
   while (v->i < lum_vector_size((lum_Vector*)&main_p->entities)) {
     lum_Entity e = lum__pool_entities(main_p)[v->i];
-    uint32_t main_pos = v->i++;
+    v->i++;
     if (!lum_ecs_alive(v->ecs, e)) continue;
     uint32_t index = lum__entity_index(e);
     uint32_t pos_a = lum__pool_sparse(pa)[index];

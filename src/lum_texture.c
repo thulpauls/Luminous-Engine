@@ -155,7 +155,7 @@ int lum_texture2d_load_from_file(lum_Texture2d* texture, const char* path, uint3
   unsigned char* pixels = stbi_load(path, &width, &height, &channels, desired_channels);
   if (!pixels) return 0;
 
-  int upload_channels = desired_channels ? desired_channels : channels;
+  int upload_channels = desired_channels ? (int)desired_channels : channels;
   int success = lum_texture2d_create(texture, width, height, upload_channels, pixels, flags);
   stbi_image_free(pixels);
 

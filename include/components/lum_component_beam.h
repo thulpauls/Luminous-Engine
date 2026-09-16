@@ -26,7 +26,7 @@ lum_Component_type lum_component_beam_type(void);
 /* 便捷添加：填入与字段表一致的默认值 */
 lum_Component_beam* lum_component_beam_add(lum_Ecs* ecs, lum_Entity e);
 
-/* 渲染系统（lum_scene_add_render_system 用）：additive 混合，端点偏移经 world 矩阵变换 */
-void lum_component_beam_render_system(lum_Ecs* ecs, void* user_data);
+/* 渲染系统（挂到 Lum_Stage_Scene 用）：additive 混合，端点偏移经 world 矩阵变换 */
+void lum_component_beam_render_system(lum_Ecs* ecs, lum_Context* ctx, void* user_data);
 
 #endif //Lum_Component_Beam_H

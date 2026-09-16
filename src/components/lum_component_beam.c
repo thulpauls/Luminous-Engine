@@ -48,7 +48,8 @@ lum_Component_beam* lum_component_beam_add(lum_Ecs* ecs, lum_Entity e) {
   return beam;
 }
 
-void lum_component_beam_render_system(lum_Ecs* ecs, void* user_data) {
+void lum_component_beam_render_system(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)ctx;
   (void)user_data;
   if (g_beam_type == Lum_Component_Invalid) return;
   lum_renderer2d_set_blend_mode(Lum_Blend_Additive);

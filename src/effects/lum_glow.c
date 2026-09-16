@@ -1,4 +1,4 @@
-#include "lum_glow.h"
+#include "effects/lum_glow.h"
 #include "lum_renderer2d.h"
 #include "lum_shader.h"
 #include "lum_material.h"
@@ -126,7 +126,7 @@ void lum_glow_draw_advanced(lum_Vec2 center, float radius, int32_t layer, lum_Ve
   lum_Mat4 model = lum_transform2d_get_matrix(&t);
 
   lum_Vertex v[4];
-  lum_build_quad(model, color, v);
+  lum_renderer2d_build_quad(model, color, v);
 
   lum_Material_parameter key[4];
   key[0] = lum_material_construct_parameter_1f("u_core_size", core_size);
@@ -153,7 +153,7 @@ void lum_glow_draw_ring_advanced(lum_Vec2 center, float radius, int32_t layer, l
   lum_Mat4 model = lum_transform2d_get_matrix(&t);
 
   lum_Vertex v[4];
-  lum_build_quad(model, color, v);
+  lum_renderer2d_build_quad(model, color, v);
 
   lum_Material_parameter key[5];
   key[0] = lum_material_construct_parameter_1f("u_ring_radius", ring_radius);

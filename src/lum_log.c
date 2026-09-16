@@ -101,7 +101,9 @@ void lum_log_message(lum_Log_level level, const char* file, int line, const char
     }
 
     if (g_log.file) {
-        fprintf(g_log.file, "%s[%s][%s][%s:%d %s]%s ", time_buf, level_name, file, line, fn, reset);
+        /* 文件分支不带颜色：不传 level_color/reset，格式串也相应去掉两个 %s
+           （原先格式串照抄 stderr 分支的 7 个占位符却只给 6 个实参，是 UB） */
+        fprintf(g_log.file, "[%s][%s][%s:%d %s] ", time_buf, level_name, file, line, fn);
         va_list args_copy;
         va_copy(args_copy, args);
         vfprintf(g_log.file, fmt, args_copy);
