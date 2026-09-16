@@ -15,19 +15,26 @@ message(STATUS "C compiler:   ${CMAKE_C_COMPILER}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 
 # 版本号唯一来源 = include/lum_version.h（只读取，不反向生成头文件）。
-# 必须在 project() 之前解析，好让 project(VERSION) 直接采用这三个值 ——
-# 这样构建系统与公共头不可能各写一份而悄悄漂移。
+# 必须在 project() 之前解析，好让 project(VERSION) 直接采用解析出来的值。
+# 本项目的版本是"阶段词 + 主要.patch"三段式，而 CMake 的 project(VERSION) 只接受
+# 数字、塞不进阶段词：因此数字部分以 `主要.patch` 两段喂给 CMake（PROJECT_VERSION
+# 形如 "0.1"），阶段词单独取出供消息与 tag 使用。
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/include/lum_version.h" LUM_VERSION_HEADER)
-foreach(_part MAJOR MINOR PATCH)
+foreach(_part MAJOR PATCH)
     string(REGEX MATCH "#define LUM_VERSION_${_part}[ \t]+([0-9]+)" _hit "${LUM_VERSION_HEADER}")
     set(LUM_VERSION_${_part} "${CMAKE_MATCH_1}")
     if(NOT LUM_VERSION_${_part} MATCHES "^[0-9]+$")
         message(FATAL_ERROR "无法从 include/lum_version.h 解析 LUM_VERSION_${_part}")
     endif()
 endforeach()
+string(REGEX MATCH "#define LUM_VERSION_STAGE[ \t]+\"([^\"]*)\"" _hit "${LUM_VERSION_HEADER}")
+set(LUM_VERSION_STAGE "${CMAKE_MATCH_1}")
+if(LUM_VERSION_STAGE STREQUAL "")
+    message(FATAL_ERROR "无法从 include/lum_version.h 解析 LUM_VERSION_STAGE")
+endif()
 
-project(Luminous VERSION ${LUM_VERSION_MAJOR}.${LUM_VERSION_MINOR}.${LUM_VERSION_PATCH})
-message(STATUS "Luminous version: ${PROJECT_VERSION}")
+project(Luminous VERSION ${LUM_VERSION_MAJOR}.${LUM_VERSION_PATCH})
+message(STATUS "Luminous version: ${LUM_VERSION_STAGE} ${PROJECT_VERSION}")
 
 add_compile_definitions(Lum_Debug)
 
