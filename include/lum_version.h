@@ -28,35 +28,36 @@
 
 /* 开发阶段标记：纯标签，不参与比较、无顺序语义。
    词表（仅文档约定，代码不校验）：prototype / alpha / beta / rc / release */
-#define LUM_VERSION_STAGE "prototype"
+#define Lum_Version_Stage "prototype"
 
 /* 主要版本号：代际 */
-#define LUM_VERSION_MAJOR 0
+#define Lum_Version_Major 0
 
 /* patch 版本号：本代际内的迭代次数 */
-#define LUM_VERSION_PATCH 1
+#define Lum_Version_Patch 1
 
 /* ---------- 比较与显示 ---------- */
 
 /* 两段数字打包成单个整数，便于编译期比较：
-     #if LUM_VERSION < LUM_VERSION_ENCODE(1, 0)
+     #if Lum_Version < Lum_Version_Encode(1, 0)
        #error "需要 Luminous 1.0 或更高"
      #endif
    注意：这里刻意只用整数乘加、不做任何类型转换。#if 的预处理器不认
    `(unsigned long)` 这类多词类型转型（GCC 会报 "missing binary operator
    before token 'long'"）；不带转型的写法在 #if 和普通 C 表达式里都成立。
    每段上限 255（8 位） */
-#define LUM_VERSION_ENCODE(major, patch) ((major) * 256 + (patch))
+#define Lum_Version_Encode(major, patch) ((major) * 256 + (patch))
 
-#define LUM_VERSION \
-  LUM_VERSION_ENCODE(LUM_VERSION_MAJOR, LUM_VERSION_PATCH)
+#define Lum_Version \
+  Lum_Version_Encode(Lum_Version_Major, Lum_Version_Patch)
 
-/* 字符串字面量版本号，形如 "prototype 0.1"。相邻字面量拼接，无运行时代价 */
-#define LUM_VERSION_STR_(x) #x
-#define LUM_VERSION_STR(x)  LUM_VERSION_STR_(x)
-#define LUM_VERSION_STRING                        \
-  LUM_VERSION_STAGE " "                           \
-  LUM_VERSION_STR(LUM_VERSION_MAJOR) "."          \
-  LUM_VERSION_STR(LUM_VERSION_PATCH)
+/* 字符串字面量版本号，形如 "prototype 0.1"。相邻字面量拼接，无运行时代价。
+   两级宏是必需的：只有经过一层展开，参数才会先被替换、再被字符串化 */
+#define Lum_Version_Stringize_(x) #x
+#define Lum_Version_Stringize(x)  Lum_Version_Stringize_(x)
+#define Lum_Version_String                      \
+  Lum_Version_Stage " "                         \
+  Lum_Version_Stringize(Lum_Version_Major) "."  \
+  Lum_Version_Stringize(Lum_Version_Patch)
 
 #endif //Lum_Version_H
