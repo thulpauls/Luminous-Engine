@@ -50,10 +50,24 @@ cmake --build build
 
 ## 3. 命名与风格
 
-- 函数 `lum_snake_case`；类型 / 枚举 / **宏** `Lum_Pascal_Snake`
-  （宏一律 `Lum_` 前缀 + 逐词首字母大写，如 `Lum_Ecs_Max_Entities`、`Lum_Ui_Popup_Layer`）
-- 全库仅两个例外：`containers/lum_list.h` 的**小写**泛型宏（`lum_list_each` 等，
-  对齐函数命名），以及第三方要求的 `STB_IMAGE_IMPLEMENTATION`
+三套前缀，规则**各不相同**，别混用：
+
+| 类别 | 形式 | 例子 |
+|---|---|---|
+| 函数 | `lum_` + 全小写 snake_case | `lum_ecs_create`、`lum_scene_pick` |
+| **类型**（typedef / struct / enum 标签） | `lum_` + **首词首字母大写、后续词全小写** | `lum_Component_transform`、`lum_Ecs_view`、`lum_Texture_flag`、`lum_Render_target` |
+| **宏 与 枚举常量** | `Lum_` + **每个词首字母大写** | `Lum_Ecs_Max_Entities`、`Lum_Stage_Init`、`Lum_Texture_Flag_Mipmaps` |
+
+- 数字段算一个词：`Lum_Key_0`、`Lum_Material_Parameter_1i`、`lum_Texture2d` 都合规
+- **实测例外**（对公开头全量校验：类型 57/58、宏 84/89、枚举常量 128/134）：
+  - `containers/lum_list.h` 与 `containers/lum_vector.h` 的泛型宏用**小写** `lum_`
+    （`lum_list_each`、`lum_list_entry`、`lum_vector_get_t`）—— 刻意对齐函数命名
+  - **`lum_Ui_Align` 违反类型规则**：后续词应全小写，即 `lum_Ui_align`
+  - 内置组件 id 常量用**小写** `lum_` 而非 `Lum_`：
+    `lum_Component_transform_id` … `lum_Component_builtin_count`
+  - 后两条是**冻结前必须表态**的项 —— 改名属破坏性变更，要么现在改，要么正式写进例外
+- **校验这类规则必须区分大小写**：PowerShell 的 `-match` **默认忽略大小写**，
+  会把不合规的名字判成合规。用 `[regex]::IsMatch($name, $pattern)`（本仓库踩过）
 - 注释用**中文**，Doxygen 子集：`@brief` / `@param` / `@return` / `@note` / `@warning`
 - 头文件守卫 `Lum_X_H`，结尾 `#endif //Lum_X_H`
 - 2 空格缩进；`Lum_Assert` 只用于**编程错误**，数据相关失败返回 `0` / `false` / `NULL` 并记日志

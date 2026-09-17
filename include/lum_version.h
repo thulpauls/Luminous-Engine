@@ -52,9 +52,10 @@
   Lum_Version_Encode(Lum_Version_Major, Lum_Version_Patch)
 
 /* 字符串字面量版本号，形如 "prototype 0.1"。相邻字面量拼接，无运行时代价。
-   两级宏是必需的：只有经过一层展开，参数才会先被替换、再被字符串化 */
-#define Lum_Version_Stringize_(x) #x
-#define Lum_Version_Stringize(x)  Lum_Version_Stringize_(x)
+   两级宏是必需的：只有经过一层展开，参数才会先被替换、再被字符串化。
+   Impl 那层只在本文件内使用；带下划线后缀会违反宏命名约定（每段首字母大写） */
+#define Lum_Version_Stringize_Impl(x) #x
+#define Lum_Version_Stringize(x)  Lum_Version_Stringize_Impl(x)
 #define Lum_Version_String                      \
   Lum_Version_Stage " "                         \
   Lum_Version_Stringize(Lum_Version_Major) "."  \
