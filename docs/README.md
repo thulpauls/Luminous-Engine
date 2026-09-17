@@ -21,19 +21,23 @@
 
 | 文档 | 内容 | 状态 |
 |---|---|---|
-| `architecture.md` | 分层与模块总览 | ✅ 已完成 |
-| `CONTRACT.md` | 跨模块语义契约 | 待写 |
-| `versioning.md` | 编号策略 | 待写 |
-| `modules/base.md` | 基础层（log / assert / version / math2d / collision / containers） | 待写 |
-| `modules/platform.md` | 平台层（filesystem / window / input / time） | 待写 |
-| `modules/render.md` | 渲染层（shader / texture / atlas / camera / transform / renderer2d / material / render_target） | 待写 |
-| `modules/assets.md` | 资源层 | 待写 |
-| `modules/serial.md` | 序列化层 | 待写 |
-| `modules/scene.md` | 场景层（ecs / scene / scene_io） | 待写 |
-| `modules/components.md` | 内置扩展组件 | 待写 |
-| `modules/effects.md` | 特效 | 待写 |
-| `modules/subsystem.md` | 子系统（text_renderer / ui） | 待写 |
-| `tools/api-coverage.ps1` | 列出缺注释的公开符号 | 待写 |
+| [`architecture.md`](architecture.md) | 分层与模块总览 | ✅ |
+| [`CONTRACT.md`](CONTRACT.md) | 跨模块语义契约（术语表 / 线程 / 失败 / 所有权 / ECS 指针失效 / 坐标系 / 枚举稳定性） | ✅ |
+| [`versioning.md`](versioning.md) | 三段式版本号、四个版本轴、依赖矩阵、tag 约定 | ✅ |
+| [`modules/base.md`](modules/base.md) | 基础层（version / log / assert / math2d / collision / vector / list） | ✅ |
+| [`modules/platform.md`](modules/platform.md) | 平台层（filesystem / window / input_codes / input / time） | ✅ |
+| [`modules/render.md`](modules/render.md) | 渲染层（renderer2d / shader / texture / atlas / camera / transform / material / render_target） | ✅ |
+| [`modules/assets.md`](modules/assets.md) | 资源层（assets 缓存） | ✅ |
+| [`modules/serial.md`](modules/serial.md) | 序列化层（Archive + 字段表） | ✅ |
+| [`modules/scene.md`](modules/scene.md) | 场景层（ecs / scene / scene_io） | ✅ |
+| [`modules/components.md`](modules/components.md) | 内置扩展组件（glow / beam 实体组件） | ✅ |
+| [`modules/effects.md`](modules/effects.md) | 特效（glow / beam 即时绘制） | ✅ |
+| [`modules/subsystem.md`](modules/subsystem.md) | 子系统（text_renderer / ui） | ✅ |
+| `tools/api-coverage.ps1` | 列出缺注释的公开符号 | 待写（非 markdown） |
+
+**写作依据**：本目录所有契约均从代码中提取（`#include` 关系、`src/` 实现、
+实测行为），不写推测内容。凡"代码行为已如此但头文件未写"的，标注为
+**⚠ 未成文**，它们是冻结前要补进头文件的部分。
 
 ## 二期（可选）
 

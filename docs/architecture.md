@@ -262,8 +262,9 @@ Post 及之后读 `world` 才是本帧最新的**。详见 `include/lum_applicat
 
 | 文档 | 内容 | 状态 |
 |---|---|---|
-| `docs/architecture.md` | 本文 | ✅ |
-| `docs/CONTRACT.md` | 跨模块语义契约（线程/失败/所有权/坐标系/枚举稳定性） | 待写 |
-| `docs/versioning.md` | 编号策略（冻结时定稿） | 待写 |
-| `docs/modules/*.md` | 逐层参考 | 待写 |
+| [`architecture.md`](architecture.md) | 本文 | ✅ |
+| [`CONTRACT.md`](CONTRACT.md) | 跨模块语义契约（线程/失败/所有权/坐标系/枚举稳定性） | ✅ |
+| [`versioning.md`](versioning.md) | 三段式版本号与四个版本轴 | ✅ |
+| [`modules/*.md`](modules/base.md) | 逐层参考（base / platform / render / assets / serial / scene / components / effects / subsystem） | ✅ |
 | `include/*.h` | 逐符号契约（Doxygen 语法，二期渲染） | 进行中（35 个头中 4 个已有标记） |
+| `tools/api-coverage.ps1` | 列出缺注释的公开符号 | 待写 |
