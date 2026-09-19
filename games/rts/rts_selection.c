@@ -72,19 +72,17 @@ void rts_selection_resolve(rts_Selection* s, lum_Ecs* ecs,
   lum_Component_type unit_t = rts_units_type();
   if (unit_t == Lum_Component_Invalid) return;
 
-  /* 先全清 + 数总数：一格视图，代价 O(n) */
-  uint32_t total = 0;
-  {
-    lum_Ecs_view v = lum_ecs_view_create(ecs, unit_t);
-    rts_Unit* u;
-    while (lum_ecs_view_each(&v, (void**)&u) != Lum_Entity_Null) {
-      u->selected = 0;
-      ++total;
-    }
-  }
-
   if (s->pending) {
     s->pending = false;
+
+    /* 清空旧选择 —— 【只在这一刻清】。
+       早先的写法把"清空"放在函数开头无条件执行，于是没有请求的帧也会把
+       selected 全抹掉，表现为"框选只选中一瞬间"。 */
+    {
+      lum_Ecs_view v = lum_ecs_view_create(ecs, unit_t);
+      rts_Unit* u;
+      while (lum_ecs_view_each(&v, (void**)&u) != Lum_Entity_Null) u->selected = 0;
+    }
 
     if (s->pending_is_click) {
       /* 单击：取最上层（layer 最大、平局后建者胜）—— 交给引擎的 pick，
@@ -118,11 +116,13 @@ void rts_selection_resolve(rts_Selection* s, lum_Ecs* ecs,
     }
   }
 
-  uint32_t sel = 0;
+  /* 统计：每帧刷新，但【不动 selected】 */
+  uint32_t total = 0, sel = 0;
   {
     lum_Ecs_view v = lum_ecs_view_create(ecs, unit_t);
     rts_Unit* u;
     while (lum_ecs_view_each(&v, (void**)&u) != Lum_Entity_Null) {
+      ++total;
       if (u->selected) ++sel;
     }
   }

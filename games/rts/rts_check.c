@@ -197,6 +197,50 @@ int main(void) {
     check("pending_is_click", (uint32_t)s.pending_is_click, 1);
   }
 
+  printf("\n[13] 选中必须【跨帧保持】—— 这是\"只选中一瞬间\"的回归\n");
+  {
+    cam.position = lum_vec2_0();
+    cam.zoom = 1.0f;
+    box_select(&s, ecs, &cam, win, lum_vec2_create(-20, 20), lum_vec2_create(30, -20));
+    check("第 1 帧（有请求）selected", s.selected_count, 1);
+
+    /* 之后连续几帧都没有新请求。早先的实现把"清空"放在 resolve 开头无条件执行，
+       所以这几帧会把选择抹掉 —— 必须仍然保持 1。 */
+    for (int i = 0; i < 3; ++i) rts_selection_resolve(&s, ecs, &cam, win);
+    check("第 4 帧（无请求）selected 保持", s.selected_count, 1);
+
+    /* 不只查计数，直接查组件里的标志 */
+    uint32_t flagged = 0;
+    {
+      lum_Ecs_view v = lum_ecs_view_create(ecs, rts_units_type());
+      rts_Unit* u;
+      while (lum_ecs_view_each(&v, (void**)&u) != Lum_Entity_Null) {
+        if (u->selected) ++flagged;
+      }
+    }
+    check("组件 selected 标志仍是 1", flagged, 1);
+  }
+
+  printf("\n[14] 单击选中同样要跨帧保持\n");
+  {
+    rts_selection_init(&s);
+    s.pending = true; s.pending_is_click = true;
+    s.pending_point_px = screen_of_world(lum_vec2_create(0, 0));
+    rts_selection_resolve(&s, ecs, &cam, win);
+    check("第 1 帧 selected", s.selected_count, 1);
+    for (int i = 0; i < 3; ++i) rts_selection_resolve(&s, ecs, &cam, win);
+    check("第 4 帧 selected 保持", s.selected_count, 1);
+  }
+
+  printf("\n[15] 新的空框选应能覆盖旧选择（清空仍要生效）\n");
+  {
+    box_select_screen(&s, ecs, &cam, win,
+                      lum_vec2_create(10, 660), lum_vec2_create(60, 700));   /* 空白角落 */
+    check("selected_count", s.selected_count, 0);
+    for (int i = 0; i < 2; ++i) rts_selection_resolve(&s, ecs, &cam, win);
+    check("之后仍为 0", s.selected_count, 0);
+  }
+
   lum_ecs_destroy(ecs);
   printf("\n==== %s（失败 %d 项）====\n", g_fail == 0 ? "全部通过" : "有失败", g_fail);
   return g_fail == 0 ? 0 : 1;
