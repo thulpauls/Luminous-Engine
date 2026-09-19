@@ -57,4 +57,23 @@ target_include_directories(Luminous PRIVATE third_party)
 add_executable(Luminous_collision_demo collision_demo.c)
 target_link_libraries(Luminous_collision_demo Luminous glfw)
 
+# ---------- RTS 示例 ----------
+# 显式列出源文件（不用 GLOB）：新增文件必须显式加进来，避免"忘了加文件却静默通过"
+add_executable(Luminous_rts
+    games/rts/rts_main.c
+    games/rts/rts_camera.c
+    games/rts/rts_selection.c
+    games/rts/rts_units.c)
+target_link_libraries(Luminous_rts Luminous glfw)
+
+# ---------- RTS 回归检查（无窗口、无 GL：只跑逻辑与数学）----------
+# 这是仓库里第一个回归检查。它只依赖公共头 + 纯逻辑路径（lum_flow_run_steps），
+# 不碰窗口，因此可以在任何环境下运行。
+add_executable(Luminous_rts_check
+    games/rts/rts_check.c
+    games/rts/rts_selection.c
+    games/rts/rts_units.c)
+target_include_directories(Luminous_rts_check PRIVATE games/rts)
+target_link_libraries(Luminous_rts_check Luminous glfw)
+
 file(COPY resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

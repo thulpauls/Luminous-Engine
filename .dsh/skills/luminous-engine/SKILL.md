@@ -85,6 +85,7 @@ cmake --build build
 | **`lum_ecs_flush`** | `destroy_entity` 只置死；槽位回收与世代推进发生在 `flush`。自己驱动流程必须手动调，走引擎时 `Lum_Stage_Commit` 会调 |
 | **窗口尺寸 ≠ framebuffer 尺寸** | 高 DPI 下不同；渲染与视口**必须用 framebuffer 尺寸** |
 | **视口左下原点，屏幕/UI 左上原点** | 混用会上下颠倒 |
+| **Screen 阶段的坐标已经是像素** | `Lum_Stage_Screen` 的 VP 是 `ortho(0, sw, sh, 0)`（像素、**左上原点**），文字/图形**直接给像素坐标**。**不要**再套 `lum_app_screen_to_world` —— 那是世界空间换算，会把内容推到画面外。`collision_demo.c` 原来正是这么写的，导致它的 HUD 整段不可见（实测 `screen_to_world(16,24)=(-544,316)`，当像素用则 NDC x=−1.97）。**别照抄旧 demo 的 HUD 写法** |
 | **`lum_scene_pick` 依赖 world 矩阵** | 未跑过 `Transform` 阶段 → 用的是上一帧矩阵，命中区域偏移 |
 | **无线程安全** | 全库 0 个线程原语，遍地全局单例（log/input/time/window/ui/assets/effects/renderer2d/注册表/`lum_default_theme`）。跨线程即 UB，无诊断 |
 | **`Lum_Debug` 改变公开面** | `Lum_Assert` 变 no-op、`lum_vec2_print` 系列消失、`Lum_Log_Trace/Debug` 变 no-op → 同版本号可有不同 API 面 |
@@ -129,3 +130,59 @@ cmake --build build
 7. **`tests/` 为空**，没有回归网
 8. 仍未处理：`resources/` 下两个 Monotype 商业字体（未提交）、
    `tools/api-coverage.ps1`（未写）、`CMakePresets.json`（未加）
+
+---
+
+## 8. RTS（本项目）进度与约定
+
+### 位置与命名
+
+- 代码在 **`games/rts/`**；标识符用 **`rts_` / `Rts_`** 前缀，与引擎的 `lum_` / `Lum_` 明确区分
+- 目标：`Luminous_rts`（游戏本体）、`Luminous_rts_check`（**无窗口**回归检查）
+- 游戏是**纯消费者**：`games/` 下的源码只用 `-Iinclude` 就能编过，
+  看不到 `src/`，也看不到 `third_party/`。**这条要一直保持**
+
+### 里程碑
+
+| | 内容 | 状态 |
+|---|---|---|
+| M1 | 相机（键盘/边缘/中键拖拽 + 滚轮以光标为锚缩放）＋ 框选与单击选中 | ✅ 完成 |
+| M2 | 移动与命令（右键下令、命令队列） | 待做 |
+| M3 | 寻路（网格 A\*）＋ 单位互斥/建筑阻挡 | 待做 |
+| M4 | 战斗（索敌/冷却/伤害/死亡/血条） | 待做 |
+| M5 | 经济与建造 | 待做 |
+| M6 | HUD ＋ 小地图（用 `lum_View` + `category_mask`） | 待做 |
+| M7 | 存档、AI、胜负 | 待做 |
+
+### 无窗口验证路径（重要）
+
+`lum_flow_run_steps(ecs, n, dt)` 不碰 GL，可以直接跑 `Input..Commit`（含 `Transform`），
+因此**选择/移动这类逻辑能脱离窗口测试**。`games/rts/rts_check.c` 就是这么做的：
+建 ECS → 生成单位 → 跑一步 → 直接调逻辑函数 → 断言。
+
+**推论**：游戏逻辑不要内部去取 `lum_app_get_camera()` / `lum_window_get_*()` 这类全局单例，
+而是**显式把 camera 和 window_size 作为参数传进来**，否则这段逻辑就无法 headless 测试。
+（M1 已经把 `rts_selection_resolve` 改成这个形状。）
+
+### M1 期间确认的约束
+
+- **`lum_app_screen_to_world` 依赖窗口单例**：无窗口时 `lum_window_get_width()` 返回 0，
+  转换会断言失败/除零。所以可测试的代码用 `lum_camera2d_screen_to_world(cam, p, window_size)`
+- **框选 AABB 必须与 `lum_scene_pick` 用同一套判定**（列向量长度=层级缩放、平移=m[12..13]、
+  忽略旋转、**闭区间**），否则会出现"点得到但框不到"。闭区间意味着**相切算命中**
+- **单位必须同 layer 才能合批**：`Rts_Layer_Units` 一个常量给所有单位；
+  不要按 Y 排序给每个单位唯一 layer
+- **ECS 三组件上限正好用满**：单位 = transform + sprite + unit。
+  再加组件就得拆遍历（或改引擎）
+- 多单位选择统计、清空都是用**单组件视图**一趟 O(n) 完成，够用；上千单位再考虑空间索引
+
+### 施工纪律
+
+1. 发现**引擎层面的新陷阱/新约定** → **先补本 skill**，再继续写游戏代码
+2. 里程碑完成 → 更新上面的表 + 把"临时绕法"升级成引擎能力或写进 `docs/CONTRACT.md`
+3. 每次改完跑：全量构建（0 warning）＋ `Luminous_rts_check` ＋ `Luminous_rts` 冒烟
+
+### 已修的引擎侧问题（本项目推进中发现）
+
+- `collision_demo.c` 的 HUD 曾整段画在画面外（多套了一层 `screen_to_world`）—— 已修，
+  详见 §4 的 "Screen 阶段的坐标已经是像素"
