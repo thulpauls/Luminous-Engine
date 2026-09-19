@@ -237,13 +237,23 @@ void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 c
 
 void lum_tr_draw_screen(lum_Font* font, const char* text, lum_Vec2 top_left, int32_t layer, lum_Vec4 color) {
   if (!font || !font->initialized) return;
-  /* Screen 阶段的 VP 是 ortho(0, sw, sh, 0)（Y 向下），而 lum_tr_draw_layer 画的是
-     Y 向上的世界空间文字 —— 必须把"左上角"换算成翻转后的基线位置。
-     用视口高而不是窗口高：Screen 的 VP 用的就是当前视口尺寸。 */
+
   int sw = 0, sh = 0;
   lum_renderer2d_get_viewport(NULL, NULL, &sw, &sh);
+  if (sw <= 0 || sh <= 0) return;
+
+  /* 关键：文字渲染器的几何是【Y 向上】的（字形位图在上传前被翻成 GL 底朝向，
+     见 lum__tr_load_glyph），而 Screen 阶段的 VP 是 ortho(0, sw, sh, 0)（Y 向下）。
+     只挪基线位置并不能改字形朝向 —— 必须换一个【Y 向上的像素 VP】来画这几条命令。
+     渲染器会给每条命令记录当时的 VP 快照，所以临时切换只影响这里的文字
+     （lum_renderer2d_draw_fullscreen 用的是同一个套路）。 */
+  lum_Mat4 saved = lum_renderer2d_view_projection();
+  lum_renderer2d_set_view_projection(lum_mat4_ortho(0.0f, (float)sw, 0.0f, (float)sh, -1.0f, 1.0f));
+
   float baseline = (float)sh - top_left.y - lum_tr_ascent(font);
   lum_tr_draw_layer(font, text, lum_vec2_create(top_left.x, baseline), layer, color);
+
+  lum_renderer2d_set_view_projection(saved);
 }
 
 float lum_tr_ascent(lum_Font* font) {

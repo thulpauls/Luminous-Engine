@@ -25,10 +25,12 @@ void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 c
 /*
 * @brief 在【屏幕空间】绘制文字：top_left 为文字左上角，单位是当前视口像素、左上原点
 *
-*        lum_tr_draw_layer 画的是【世界空间、Y 向上】的文字（position 是基线，字形向上长）。
-*        而 Lum_Stage_Screen 的 VP 是 ortho(0, sw, sh, 0)（Y 向下），
-*        若直接把像素坐标交给 lum_tr_draw_layer，会得到【上下颠倒】的文字。
-*        本函数内部做 Y 翻转 + 基线换算（baseline = 视口高 − top_left.y − ascent），
+*        lum_tr_draw_layer 画的是【Y 向上】的文字（字形位图在上传前被翻成 GL 底朝向，
+*        position 是基线、字形向上生长）。而 Lum_Stage_Screen 的 VP 是
+*        ortho(0, sw, sh, 0)（Y 向下）—— 直接把像素坐标交给它，文字会【上下颠倒】。
+*
+*        本函数在绘制期间临时换成 Y 向上的像素 VP（命令记录 VP 快照，故只影响这些命令），
+*        并把 top_left 换算成基线（baseline = 视口高 − top_left.y − ascent）。
 *        专供 Screen 阶段；世界空间文字请继续用 lum_tr_draw_layer。
 */
 void lum_tr_draw_screen(lum_Font* font, const char* text, lum_Vec2 top_left, int32_t layer, lum_Vec4 color);

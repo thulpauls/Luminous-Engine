@@ -644,8 +644,10 @@ static void lum__ui_button_top_highlight(lum_Rect r, lum_Vec4 bg) {
 
 static void lum__ui_draw_text(lum_Vec2 top_left, const char* text, lum_Vec4 color) {
   if (!g_ui.font) return;
-  float baseline = g_ui.window_h - top_left.y - lum_tr_ascent(g_ui.font);
-  lum_tr_draw_layer(g_ui.font, text, lum_vec2_create(top_left.x, baseline), Lum_Ui_Layer, color);
+  /* 交给 lum_tr_draw_screen：它会在绘制期间换成 Y 向上的像素 VP。
+     直接调 lum_tr_draw_layer 会让字形在 Screen 阶段的 Y 向下 VP 里上下颠倒
+     —— 原先这里手写的 baseline 换算只挪了位置，并没有解决朝向。 */
+  lum_tr_draw_screen(g_ui.font, text, top_left, Lum_Ui_Layer, color);
 }
 
 /* 剪裁换算：UI 公共矩形（逻辑像素、左上原点）→ 渲染目标像素（左下原点、framebuffer 尺寸）。

@@ -86,7 +86,7 @@ cmake --build build
 | **窗口尺寸 ≠ framebuffer 尺寸** | 高 DPI 下不同；渲染与视口**必须用 framebuffer 尺寸** |
 | **视口左下原点，屏幕/UI 左上原点** | 混用会上下颠倒 |
 | **Screen 阶段的图形直接给像素坐标** | `Lum_Stage_Screen` 的 VP 是 `ortho(0, sw, sh, 0)`（像素、**左上原点**）。`draw_rect` / `draw_line` 等**直接给像素坐标**。**不要**套 `lum_app_screen_to_world`（世界换算）—— `collision_demo.c` 曾这样写，HUD 整段被推到画面外（实测 `screen_to_world(16,24)=(-544,316)`，当像素用则 NDC x=−1.97） |
-| **Screen 阶段的文字必须翻转 Y** | `lum_tr_draw_layer` 画的是**世界空间、Y 向上**的文字（position 是基线、字形向上长）。Screen 阶段 Y 向下，**直接传像素坐标会得到上下颠倒的文字**。用 **`lum_tr_draw_screen(font, text, top_left, layer, color)`**（内部换算 `baseline = 视口高 − top_left.y − ascent`）。这个坑咬过三处：引擎 UI 自己手写、`collision_demo`、RTS —— 别再用 `lum_tr_draw_layer` 画 HUD |
+| **Screen 阶段的文字必须换 VP** | 文字渲染器的几何是 **Y 向上**的（字形位图在上传前被翻成 GL 底朝向，见 `lum__tr_load_glyph`），而 Screen 阶段的 VP 是 `ortho(0, sw, sh, 0)`（Y 向下）。**只挪基线位置解决不了朝向**——必须在绘制期间临时换成 Y 向上的像素 VP。用 **`lum_tr_draw_screen(font, text, top_left, layer, color)`**，它内部就是这么做的（靠"每条命令记录 VP 快照"只影响这几条命令）。直接用 `lum_tr_draw_layer` 画 HUD 会得到**上下颠倒**的文字。这个坑咬过四处：引擎 UI 自己手写、`collision_demo`、RTS，以及我第一次的修法（只翻了位置） |
 | **指针可能在窗口外，客户区坐标会越界** | GLFW 的 `glfwGetCursorPos` 在指针离开窗口时返回**越界坐标**（实测拿到 `(1996,1218)`，而窗口只有 1280×720）。不判断的后果：① 被当成"一直贴边"→ 相机一路飞走；② 用越界坐标当框选端点 → 框被画到画面外，看起来像"框瞬间消失"，且松手后什么都选不中。**用窗口尺寸做 inside 判断，并把拖动端点夹到窗口边界** |
 | **`lum_scene_pick` 依赖 world 矩阵** | 未跑过 `Transform` 阶段 → 用的是上一帧矩阵，命中区域偏移 |
 | **无线程安全** | 全库 0 个线程原语，遍地全局单例（log/input/time/window/ui/assets/effects/renderer2d/注册表/`lum_default_theme`）。跨线程即 UB，无诊断 |
@@ -193,6 +193,11 @@ cmake --build build
    （world 平移、size、layer、texture id）打出来，与相机状态对照
 3. **注意探针读的时机**：`lum_renderer2d_get_draw_call_count()` 在 `begin_frame` 就被清零，
    在 `Screen` 阶段读它**必然是 0** —— 我为此白查了一轮。要读它得放在 `Frame_End` 之后
+4. **判定"位置/朝向"要用逐行直方图，不要用"上下半区各数一半"**：
+   分界线只要切偏一行，结论就可能完全反过来（我据此把已经正立的字形误判成颠倒，
+   白折腾一轮）。正确做法是把目标区域**逐行**的像素数打出来，
+   一眼就能看出质量分布在哪、哪一行最宽。
+   实例：画 `LLLLLLLLLL`，正立时"横脚"那一行最宽且位于字形带**最下方**
 
 ### 施工纪律
 
