@@ -33,6 +33,7 @@
 | [`modules/components.md`](modules/components.md) | 内置扩展组件（glow / beam 实体组件） | ✅ |
 | [`modules/effects.md`](modules/effects.md) | 特效（glow / beam 即时绘制） | ✅ |
 | [`modules/subsystem.md`](modules/subsystem.md) | 子系统（text_renderer / ui） | ✅ |
+| [`research/spring-recoil-skirmish-ai-contract.md`](research/spring-recoil-skirmish-ai-contract.md) | **外部调研**（非本引擎）：Recoil/Spring Skirmish AI 接口契约与"托管 AI 所需的最小引擎能力"清单 | 参考 |
 | `tools/api-coverage.ps1` | 列出缺注释的公开符号 | 待写（非 markdown） |
 
 **写作依据**：本目录所有契约均从代码中提取（`#include` 关系、`src/` 实现、
