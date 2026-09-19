@@ -56,6 +56,8 @@ typedef struct lum_Component_hierarchy {
 
 /* 渲染。uv 默认 (0,0,1,1) 整图；atlas 子区域用 lum_texture2d_pixel_rect_to_uv 预算。
    size 为自身绘制尺寸（本地单位）：不进层级矩阵，不受父级缩放影响，也不影响子实体。
+   锚点：sprite 以实体的 world 平移点为中心（即绘制矩形 = 平移 ± size×层级缩放/2），
+   与 lum_scene_pick 的命中 AABB 同一套判定。
    layer 是排序键（越小越先画）；category 是可见性分类，与排序无关 */
 typedef struct lum_Component_sprite {
   const lum_Texture2d* texture;

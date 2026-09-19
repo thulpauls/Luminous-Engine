@@ -434,8 +434,12 @@ static void lum__sys_sprite(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
     if (sp->flip_x) { float tmp = uv.x; uv.x = uv.z; uv.z = tmp; }
     if (sp->flip_y) { float tmp = uv.y; uv.y = uv.w; uv.w = tmp; }
 
-    /* size 不进层级矩阵：在 world 之后再乘自身尺寸缩放，父级缩放不吞掉它 */
-    lum_Transform2d st = lum_transform2d_create(lum_vec2_0(), sp->size, lum_vec2_1(), 0.0f, lum_vec2_0());
+    /* size 不进层级矩阵：在 world 之后再乘自身尺寸缩放，父级缩放不吞掉它。
+       origin 取 size/2 —— 与 lum_scene_pick 的 AABB（world 平移 ± size×缩放/2）对齐：
+       单位四边形 [0,1]² 先缩放成 size、再平移 -size/2，最后落点就是"以 world 平移为中心"。
+       若这里给 (0,0)，画出来的是左下角锚点，会和拾取/框选错开半个尺寸 */
+    lum_Transform2d st = lum_transform2d_create(lum_vec2_0(), sp->size, lum_vec2_1(), 0.0f,
+                                                lum_vec2_scale(sp->size, 0.5f));
     lum_Mat4 model = lum_mat4_mul(t->world, lum_transform2d_get_matrix(&st));
     lum_renderer2d_draw_sprite_matrix_uv(sp->texture, model, uv, sp->layer, sp->color);
   }

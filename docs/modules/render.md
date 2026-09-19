@@ -163,7 +163,8 @@ GPU 资源与 2D 绘制。八个模块，但**只有一个绘制入口**：`lum_
 
 - `rotation` 与 `delta_rad` **都是弧度**（前者没有 `_rad` 后缀，别被误导）
 - `lum_Transform2d.size` 与场景里 `lum_Component_sprite.size` **是两个不同的东西**：
-  前者进矩阵，后者是"自身绘制尺寸"（见 [scene.md](scene.md)）
+  前者进矩阵，后者是"自身绘制尺寸"（见 [scene.md](scene.md)）。
+  `lum__sys_sprite` 用前者给后者套了一层 `origin = size/2`，把 sprite 摆成**以实体为中心**
 
 ---
 

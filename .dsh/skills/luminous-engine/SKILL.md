@@ -89,6 +89,7 @@ cmake --build build
 | **Screen 阶段的文字必须换 VP** | 文字渲染器的几何是 **Y 向上**的（字形位图在上传前被翻成 GL 底朝向，见 `lum__tr_load_glyph`），而 Screen 阶段的 VP 是 `ortho(0, sw, sh, 0)`（Y 向下）。**只挪基线位置解决不了朝向**——必须在绘制期间临时换成 Y 向上的像素 VP。用 **`lum_tr_draw_screen(font, text, top_left, layer, color)`**，它内部就是这么做的（靠"每条命令记录 VP 快照"只影响这几条命令）。直接用 `lum_tr_draw_layer` 画 HUD 会得到**上下颠倒**的文字。这个坑咬过四处：引擎 UI 自己手写、`collision_demo`、RTS，以及我第一次的修法（只翻了位置） |
 | **指针可能在窗口外，客户区坐标会越界** | GLFW 的 `glfwGetCursorPos` 在指针离开窗口时返回**越界坐标**（实测拿到 `(1996,1218)`，而窗口只有 1280×720）。不判断的后果：① 被当成"一直贴边"→ 相机一路飞走；② 用越界坐标当框选端点 → 框被画到画面外，看起来像"框瞬间消失"，且松手后什么都选不中。**用窗口尺寸做 inside 判断，并把拖动端点夹到窗口边界** |
 | **`lum_scene_pick` 依赖 world 矩阵** | 未跑过 `Transform` 阶段 → 用的是上一帧矩阵，命中区域偏移 |
+| **sprite 的锚点必须与 pick 一致** | `lum__sys_sprite` 曾传 `origin = (0,0)`（**左下角**锚点），而 `lum_scene_pick` 与框选 AABB 按"以实体局部原点为**中心**"算 → **绘制与命中差半个 `size`**。表现：选中角标相对单位偏下偏左、点选要多点半个身位。绘制侧现已统一为 `origin = size/2`。**改任何一处的锚点/尺寸语义都要同时改三处**：`lum__sys_sprite` 的绘制、`lum_scene_pick`、`lum_component_glow`（它的渲染中心也取 `m[12..13]`）。依据见 `docs/CONTRACT.md` §8 |
 | **无线程安全** | 全库 0 个线程原语，遍地全局单例（log/input/time/window/ui/assets/effects/renderer2d/注册表/`lum_default_theme`）。跨线程即 UB，无诊断 |
 | **`Lum_Debug` 改变公开面** | `Lum_Assert` 变 no-op、`lum_vec2_print` 系列消失、`Lum_Log_Trace/Debug` 变 no-op → 同版本号可有不同 API 面 |
 | **注册到引擎独占阶段会被静默拒绝** | `lum_app_add_system` 对 `Init / Frame_Begin / Transform / Commit / View_Begin / Frame_End / Shutdown` 返回 0 并告警；而**该告警可能在日志初始化之前发出从而被完全吞掉**（`lum__flow_ensure_init` 早于 `lum_stage_init` 里的 `lum_log_init`）。**引擎内部注册必须用 `lum_flow_add_engine_system`**。历史事故：引擎自己的帧边界系统用了公开入口 → 从未注册 → 整帧不清屏、不 flush、不 swap → **窗口纯白且零报错**。用户侧表现就是"白屏" |
@@ -198,6 +199,19 @@ cmake --build build
    白折腾一轮）。正确做法是把目标区域**逐行**的像素数打出来，
    一眼就能看出质量分布在哪、哪一行最宽。
    实例：画 `LLLLLLLLLL`，正立时"横脚"那一行最宽且位于字形带**最下方**
+5. **要证明"是我改的这一行导致的"，用同一二进制做 A/B，不要编两遍**：
+   把可疑行为挂到一个**环境变量开关**上（`getenv` 读一次存 `static`），
+   一次编译、跑两次、只换环境变量。这样排除"两次编译的其它差异"，
+   也让"改前/改后"的对比无歧义。实测用 `LUM__ANCHOR=lb` 复现旧的左下角锚点
+6. **让读回像素可归属**：全屏读回只给一堆非清屏像素，分不清是谁画的。
+   做法是临时加一个**孤立探针实体**：唯一颜色（如品红）+ 位于无遮挡处
+   + 只让它进入待测状态（如唯一被选中）→ 就能按**颜色分类**求包围盒。
+   再让游戏侧每帧报一次"这个实体**应该**画在哪"（`lum_app_world_to_screen`），
+   两条日志一减就是误差。实测：修复后 sprite/角标中心与期望位置差 0.5 px，
+   旧行为差 12 px（= `size/2`），判据干净利落
+7. **报"应该画在哪"时要连同相机状态一起打**：窗口一开，鼠标可能正在边缘触发
+   边缘滚动，相机自己就飘了（实测两次运行 `camera.y` 分别是 −27 和 −3.6）。
+   只打期望坐标而不打相机，就会把相机漂移误判成绘制偏移
 
 ### 施工纪律
 
@@ -209,3 +223,6 @@ cmake --build build
 
 - `collision_demo.c` 的 HUD 曾整段画在画面外（多套了一层 `screen_to_world`）—— 已修，
   详见 §4 的 "Screen 阶段的坐标已经是像素"
+- **sprite 绘制锚点与拾取/框选不一致**（差半个 `size`）—— 已修：`lum__sys_sprite` 改用
+  `origin = size/2`，并把"Sprite 以实体局部原点为中心"写进 `include/lum_scene.h`、
+  `docs/CONTRACT.md` §8、`docs/modules/{scene,render}.md`

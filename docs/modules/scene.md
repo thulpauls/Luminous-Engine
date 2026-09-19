@@ -71,6 +71,9 @@
   `Lum_Sprite_Category_Default` = `1u << 0`；视图掩码为 0 表示不筛选
 - **`sprite.size` 是"自身绘制尺寸"**：不进层级矩阵、不受父级缩放影响，
   也**不影响子实体**。`uv` 默认 `(0,0,1,1)` 整图
+- **sprite 以实体局部原点为中心**：绘制矩形 = `world 平移 ± size × 层级缩放 / 2`，
+  与 `lum_scene_pick` 的命中 AABB 是同一套判定（见
+  [CONTRACT.md §8](../CONTRACT.md)）。曾因绘制侧用左下角锚点而与拾取错开半个 `size`
 - `transform.world` 是**派生数据**，每帧由 `Lum_Stage_Transform` 覆盖 —— **只读**
 
 **视图 `lum_View`**
