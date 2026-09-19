@@ -12,8 +12,11 @@
 * 引擎自带的 UI 用 1000（Lum_Ui_Layer），这里从 1040 起错开。
 */
 enum {
+  Rts_Layer_Obstacles = 50,    /* 导航网格里的障碍（由 rts_navgrid 画） */
   Rts_Layer_Units     = 100,   /* 单位本体（由引擎内置 sprite 系统绘制） */
   Rts_Layer_Selection = 900,   /* 选中标记：压在单位之上 */
+  Rts_Layer_Path      = 940,   /* 寻路折线（调试可视化） */
+  Rts_Layer_Command   = 950,   /* 下令点的方框标记：压在选中标记之上 */
   Rts_Layer_Box_Fill  = 1040,  /* 框选矩形填充 */
   Rts_Layer_Box_Edge  = 1050,  /* 框选矩形边框 */
   Rts_Layer_Hud       = 1100   /* HUD 文字 */

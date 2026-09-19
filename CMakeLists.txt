@@ -62,7 +62,10 @@ target_link_libraries(Luminous_collision_demo Luminous glfw)
 add_executable(Luminous_rts
     games/rts/rts_main.c
     games/rts/rts_camera.c
+    games/rts/rts_navgrid.c
+    games/rts/rts_path.c
     games/rts/rts_selection.c
+    games/rts/rts_orders.c
     games/rts/rts_units.c)
 target_link_libraries(Luminous_rts Luminous glfw)
 
@@ -71,7 +74,10 @@ target_link_libraries(Luminous_rts Luminous glfw)
 # 不碰窗口，因此可以在任何环境下运行。
 add_executable(Luminous_rts_check
     games/rts/rts_check.c
+    games/rts/rts_navgrid.c
+    games/rts/rts_path.c
     games/rts/rts_selection.c
+    games/rts/rts_orders.c
     games/rts/rts_units.c)
 target_include_directories(Luminous_rts_check PRIVATE games/rts)
 target_link_libraries(Luminous_rts_check Luminous glfw)
