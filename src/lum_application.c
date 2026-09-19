@@ -106,9 +106,12 @@ static void lum__flow_ensure_init(void) {
   /* 引擎内置系统：场景层自己的（Transform / Commit / View_Begin / sprite） */
   lum_scene_register_engine_systems();
 
-  /* 帧边界：应用层自己的 */
-  lum_app_add_system(Lum_Stage_Frame_Begin, 0, lum__sys_frame_begin, NULL);
-  lum_app_add_system(Lum_Stage_Frame_End,   0, lum__sys_frame_end,   NULL);
+  /* 帧边界：应用层自己的。
+     必须走【引擎内部】入口 —— Frame_Begin / Frame_End 属于引擎独占阶段，
+     公开的 lum_app_add_system 会直接拒绝注册（!engine 分支），
+     结果是整帧不清屏、不 flush、不 swap，窗口全白且没有任何报错。 */
+  lum_flow_add_engine_system(Lum_Stage_Frame_Begin, 0, lum__sys_frame_begin, NULL);
+  lum_flow_add_engine_system(Lum_Stage_Frame_End,   0, lum__sys_frame_end,   NULL);
 }
 
 static int lum__add_system_impl(lum_Stage stage, int priority, lum_system_fn fn, void* user_data, bool engine) {

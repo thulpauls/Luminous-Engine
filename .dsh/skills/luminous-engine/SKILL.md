@@ -89,6 +89,7 @@ cmake --build build
 | **`lum_scene_pick` 依赖 world 矩阵** | 未跑过 `Transform` 阶段 → 用的是上一帧矩阵，命中区域偏移 |
 | **无线程安全** | 全库 0 个线程原语，遍地全局单例（log/input/time/window/ui/assets/effects/renderer2d/注册表/`lum_default_theme`）。跨线程即 UB，无诊断 |
 | **`Lum_Debug` 改变公开面** | `Lum_Assert` 变 no-op、`lum_vec2_print` 系列消失、`Lum_Log_Trace/Debug` 变 no-op → 同版本号可有不同 API 面 |
+| **注册到引擎独占阶段会被静默拒绝** | `lum_app_add_system` 对 `Init / Frame_Begin / Transform / Commit / View_Begin / Frame_End / Shutdown` 返回 0 并告警；而**该告警可能在日志初始化之前发出从而被完全吞掉**（`lum__flow_ensure_init` 早于 `lum_stage_init` 里的 `lum_log_init`）。**引擎内部注册必须用 `lum_flow_add_engine_system`**。历史事故：引擎自己的帧边界系统用了公开入口 → 从未注册 → 整帧不清屏、不 flush、不 swap → **窗口纯白且零报错**。用户侧表现就是"白屏" |
 | **不要用 PowerShell 文本 cmdlet 读写这些文件** | `Get-Content` / `Set-Content` 会按 ANSI(CP936) 解码 UTF-8 再写回，**损坏中文注释**（本仓库踩过）。用 `edit` / `write` 工具，或 .NET 字节 API |
 
 ---
@@ -175,6 +176,21 @@ cmake --build build
 - **ECS 三组件上限正好用满**：单位 = transform + sprite + unit。
   再加组件就得拆遍历（或改引擎）
 - 多单位选择统计、清空都是用**单组件视图**一趟 O(n) 完成，够用；上千单位再考虑空间索引
+- **边缘滚动必须判断指针确实在客户区内**：指针在窗口外时 GLFW 返回的客户区坐标会越界
+  （负值或大于宽高），不判断就会被当成"一直贴边"→ 视角一路飞走
+  （实测启动后 `camera.y` 从 0 掉到 −1228，单位全部飞出画面，看起来像"屏幕是空的"）
+
+### 诊断手法（比截图可靠）
+
+排查"画面不对"时，**不要靠截图**（GL 内容常常截不到，还会误抓桌面）：
+
+1. **帧缓冲读回**：在 `Frame_End` 里、`swap_buffers` 之前用 `glReadPixels` 读回，
+   扫描出**所有非清屏像素的包围盒**并打日志。一眼就能区分"没清屏 / 没画 / 画错位置"。
+   （需要临时在引擎侧加，因为 `glad` 对游戏不可见）
+2. **数据侧探针**：在游戏系统里自己遍历 transform+sprite，把 sprite 系统*应该*看到的数据
+   （world 平移、size、layer、texture id）打出来，与相机状态对照
+3. **注意探针读的时机**：`lum_renderer2d_get_draw_call_count()` 在 `begin_frame` 就被清零，
+   在 `Screen` 阶段读它**必然是 0** —— 我为此白查了一轮。要读它得放在 `Frame_End` 之后
 
 ### 施工纪律
 

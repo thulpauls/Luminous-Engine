@@ -81,6 +81,9 @@ static void sys_input(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
     lum_app_quit();
     return;
   }
+  if (lum_input_is_key_pressed(Lum_Key_E)) {
+    g_cam.edge_scroll_enabled = !g_cam.edge_scroll_enabled;
+  }
   /* 引擎 UI 占用输入时世界交互必须跳过。M1 还没挂 UI，但先把这条契约接好 */
   bool ui_captured = lum_ui_input_captured();
   rts_camera_ctl_update(&g_cam, lum_app_get_camera(), ui_captured);

@@ -45,20 +45,26 @@ void rts_camera_ctl_update(rts_Camera_ctl* c, lum_Camera2d* camera, bool ui_capt
     camera->position.y += dir.y * step;
   }
 
-  /* ---------- 鼠标贴边滚动 ---------- */
+  /* ---------- 鼠标贴边滚动 ----------
+     只有指针【确实在窗口客户区内】才生效。指针跑到窗口外时，GLFW 返回的客户区
+     坐标会越界（负值或大于宽高），若不判断就会一直判定为"贴边"，
+     视图一路飞走 —— 实测启动后 camera.y 从 0 掉到 -1228，单位全飞出画面。 */
   if (c->edge_scroll_enabled && !ui_captured) {
     lum_Vec2 m = lum_input_get_mouse_position();
     float w = (float)lum_window_get_width();
     float h = (float)lum_window_get_height();
-    lum_Vec2 e = lum_vec2_0();
-    if (m.x <= c->edge_margin_px)     e.x -= 1.0f;
-    if (m.x >= w - c->edge_margin_px) e.x += 1.0f;
-    if (m.y <= c->edge_margin_px)     e.y += 1.0f;    /* 屏幕上方 = 世界 Y 增大 */
-    if (m.y >= h - c->edge_margin_px) e.y -= 1.0f;
-    if (e.x != 0.0f || e.y != 0.0f) {
-      float step = c->edge_speed_px * world_per_px * dt;
-      camera->position.x += e.x * step;
-      camera->position.y += e.y * step;
+    const bool inside = (m.x >= 0.0f && m.x < w && m.y >= 0.0f && m.y < h);
+    if (inside) {
+      lum_Vec2 e = lum_vec2_0();
+      if (m.x <= c->edge_margin_px)     e.x -= 1.0f;
+      if (m.x >= w - c->edge_margin_px) e.x += 1.0f;
+      if (m.y <= c->edge_margin_px)     e.y += 1.0f;    /* 屏幕上方 = 世界 Y 增大 */
+      if (m.y >= h - c->edge_margin_px) e.y -= 1.0f;
+      if (e.x != 0.0f || e.y != 0.0f) {
+        float step = c->edge_speed_px * world_per_px * dt;
+        camera->position.x += e.x * step;
+        camera->position.y += e.y * step;
+      }
     }
   }
 
