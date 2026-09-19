@@ -8,6 +8,16 @@
 #define Rts_Selection_Click_Slop 4.0f
 
 /*
+* 鼠标状态快照：由调用方从引擎输入层填好再传进来。
+* 这样 selection 的逻辑【不依赖任何全局单例】，可以脱离窗口做回归测试。
+*/
+typedef struct rts_Mouse_state {
+  lum_Vec2 position;      /* 屏幕像素、左上原点 */
+  bool     left_pressed;  /* 边沿：本帧刚按下 */
+  bool     left_down;     /* 状态：本帧按住 */
+} rts_Mouse_state;
+
+/*
 * 框选与选中状态。
 *
 * 分两个阶段是刻意的，也是引擎数据契约要求的：
@@ -33,8 +43,12 @@ typedef struct rts_Selection {
 
 void rts_selection_init(rts_Selection* s);
 
-/* Input 阶段：起手 / 更新 / 收手。只记意图，不查 ECS */
-void rts_selection_input(rts_Selection* s, bool ui_captured);
+/* Input 阶段：起手 / 更新 / 收手。只记意图，不查 ECS。
+   window_size 用于判断指针是否在窗口内并把拖动端点夹进窗口 ——
+   指针跑到窗口外时 GLFW 的客户区坐标会大幅越界（实测拿到过 (1996,1218)，
+   而窗口只有 1280x720），不夹的话框会被画到画面外，看起来就像"框瞬间消失"。 */
+void rts_selection_input(rts_Selection* s, rts_Mouse_state mouse,
+                         lum_Vec2 window_size, bool ui_captured);
 
 /* Post 阶段：world 矩阵已更新，在这里结算命中并刷新统计。
    相机与窗口尺寸【显式传入】而不是内部去取全局单例 —— 这样这段逻辑不需要

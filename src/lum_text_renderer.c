@@ -235,6 +235,17 @@ void lum_tr_draw(lum_Font* font, const char* text, lum_Vec2 position, lum_Vec4 c
     lum_tr_draw_layer(font, text, position, 0, color);
 }
 
+void lum_tr_draw_screen(lum_Font* font, const char* text, lum_Vec2 top_left, int32_t layer, lum_Vec4 color) {
+  if (!font || !font->initialized) return;
+  /* Screen 阶段的 VP 是 ortho(0, sw, sh, 0)（Y 向下），而 lum_tr_draw_layer 画的是
+     Y 向上的世界空间文字 —— 必须把"左上角"换算成翻转后的基线位置。
+     用视口高而不是窗口高：Screen 的 VP 用的就是当前视口尺寸。 */
+  int sw = 0, sh = 0;
+  lum_renderer2d_get_viewport(NULL, NULL, &sw, &sh);
+  float baseline = (float)sh - top_left.y - lum_tr_ascent(font);
+  lum_tr_draw_layer(font, text, lum_vec2_create(top_left.x, baseline), layer, color);
+}
+
 float lum_tr_ascent(lum_Font* font) {
   if (!font || !font->initialized) return 0.0f;
   lum_Text_renderer* tr = (lum_Text_renderer*)font->renderer;

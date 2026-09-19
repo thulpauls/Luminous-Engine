@@ -85,7 +85,9 @@ cmake --build build
 | **`lum_ecs_flush`** | `destroy_entity` 只置死；槽位回收与世代推进发生在 `flush`。自己驱动流程必须手动调，走引擎时 `Lum_Stage_Commit` 会调 |
 | **窗口尺寸 ≠ framebuffer 尺寸** | 高 DPI 下不同；渲染与视口**必须用 framebuffer 尺寸** |
 | **视口左下原点，屏幕/UI 左上原点** | 混用会上下颠倒 |
-| **Screen 阶段的坐标已经是像素** | `Lum_Stage_Screen` 的 VP 是 `ortho(0, sw, sh, 0)`（像素、**左上原点**），文字/图形**直接给像素坐标**。**不要**再套 `lum_app_screen_to_world` —— 那是世界空间换算，会把内容推到画面外。`collision_demo.c` 原来正是这么写的，导致它的 HUD 整段不可见（实测 `screen_to_world(16,24)=(-544,316)`，当像素用则 NDC x=−1.97）。**别照抄旧 demo 的 HUD 写法** |
+| **Screen 阶段的图形直接给像素坐标** | `Lum_Stage_Screen` 的 VP 是 `ortho(0, sw, sh, 0)`（像素、**左上原点**）。`draw_rect` / `draw_line` 等**直接给像素坐标**。**不要**套 `lum_app_screen_to_world`（世界换算）—— `collision_demo.c` 曾这样写，HUD 整段被推到画面外（实测 `screen_to_world(16,24)=(-544,316)`，当像素用则 NDC x=−1.97） |
+| **Screen 阶段的文字必须翻转 Y** | `lum_tr_draw_layer` 画的是**世界空间、Y 向上**的文字（position 是基线、字形向上长）。Screen 阶段 Y 向下，**直接传像素坐标会得到上下颠倒的文字**。用 **`lum_tr_draw_screen(font, text, top_left, layer, color)`**（内部换算 `baseline = 视口高 − top_left.y − ascent`）。这个坑咬过三处：引擎 UI 自己手写、`collision_demo`、RTS —— 别再用 `lum_tr_draw_layer` 画 HUD |
+| **指针可能在窗口外，客户区坐标会越界** | GLFW 的 `glfwGetCursorPos` 在指针离开窗口时返回**越界坐标**（实测拿到 `(1996,1218)`，而窗口只有 1280×720）。不判断的后果：① 被当成"一直贴边"→ 相机一路飞走；② 用越界坐标当框选端点 → 框被画到画面外，看起来像"框瞬间消失"，且松手后什么都选不中。**用窗口尺寸做 inside 判断，并把拖动端点夹到窗口边界** |
 | **`lum_scene_pick` 依赖 world 矩阵** | 未跑过 `Transform` 阶段 → 用的是上一帧矩阵，命中区域偏移 |
 | **无线程安全** | 全库 0 个线程原语，遍地全局单例（log/input/time/window/ui/assets/effects/renderer2d/注册表/`lum_default_theme`）。跨线程即 UB，无诊断 |
 | **`Lum_Debug` 改变公开面** | `Lum_Assert` 变 no-op、`lum_vec2_print` 系列消失、`Lum_Log_Trace/Debug` 变 no-op → 同版本号可有不同 API 面 |

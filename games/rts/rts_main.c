@@ -21,10 +21,11 @@ static rts_Selection  g_sel;
 static lum_Font*      g_font;
 static lum_Texture2d  g_white;    /* 单位贴图：1x1 白，靠 sprite.color 染色 */
 
-/* Screen 阶段 VP 已是像素空间、左上原点 —— 这里直接收像素坐标 */
+/* Screen 阶段画 HUD：用 lum_tr_draw_screen —— 它负责把"左上角像素"换算成
+   该阶段 Y 向下 VP 所需的基线位置。直接用 lum_tr_draw_layer 会得到颠倒的文字。 */
 static void hud_text(const char* text, float px, float py, lum_Vec4 color) {
   if (!g_font) return;
-  lum_tr_draw_layer(g_font, text, lum_vec2_create(px, py), Rts_Layer_Hud, color);
+  lum_tr_draw_screen(g_font, text, lum_vec2_create(px, py), Rts_Layer_Hud, color);
 }
 
 /* 确定性随机：同一场景每次跑都一致，便于复现问题 */
@@ -87,7 +88,14 @@ static void sys_input(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
   /* 引擎 UI 占用输入时世界交互必须跳过。M1 还没挂 UI，但先把这条契约接好 */
   bool ui_captured = lum_ui_input_captured();
   rts_camera_ctl_update(&g_cam, lum_app_get_camera(), ui_captured);
-  rts_selection_input(&g_sel, ui_captured);
+
+  rts_Mouse_state mouse;
+  mouse.position = lum_input_get_mouse_position();
+  mouse.left_pressed = lum_input_is_mouse_pressed(Lum_Mouse_Button_Left);
+  mouse.left_down = lum_input_is_mouse_down(Lum_Mouse_Button_Left);
+  lum_Vec2 win = lum_vec2_create((float)lum_window_get_width(),
+                                 (float)lum_window_get_height());
+  rts_selection_input(&g_sel, mouse, win, ui_captured);
 }
 
 /* 结算命中放在 Post：Transform 阶段已跑完，transform.world 才是本步最新的。

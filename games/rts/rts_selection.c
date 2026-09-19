@@ -16,25 +16,40 @@ void rts_selection_init(rts_Selection* s) {
   s->total_count = 0;
 }
 
-void rts_selection_input(rts_Selection* s, bool ui_captured) {
+static float rts__clampf(float v, float lo, float hi) {
+  return v < lo ? lo : (v > hi ? hi : v);
+}
+
+void rts_selection_input(rts_Selection* s, rts_Mouse_state mouse,
+                         lum_Vec2 window_size, bool ui_captured) {
   if (!s) return;
   if (ui_captured) { s->dragging = false; return; }   /* UI 占用输入时不下令 */
 
-  if (lum_input_is_mouse_pressed(Lum_Mouse_Button_Left)) {
-    s->dragging = true;
-    s->start_px = lum_input_get_mouse_position();
-    s->current_px = s->start_px;
-  }
-  if (s->dragging) {
-    s->current_px = lum_input_get_mouse_position();
-    if (!lum_input_is_mouse_down(Lum_Mouse_Button_Left)) {
-      s->dragging = false;
-      float dx = s->current_px.x - s->start_px.x;
-      float dy = s->current_px.y - s->start_px.y;
-      s->pending = true;
-      s->pending_is_click = (dx * dx + dy * dy) < (Rts_Selection_Click_Slop * Rts_Selection_Click_Slop);
-      s->pending_point_px = s->current_px;
+  /* 指针可能在窗口外：GLFW 的客户区坐标此时会越界成很大的值或负值 */
+  const bool in_window = (mouse.position.x >= 0.0f && mouse.position.x <= window_size.x &&
+                          mouse.position.y >= 0.0f && mouse.position.y <= window_size.y);
+
+  if (!s->dragging) {
+    /* 起手必须在窗口内，否则框会从画面外开始 */
+    if (in_window && mouse.left_pressed) {
+      s->dragging = true;
+      s->start_px = mouse.position;
+      s->current_px = mouse.position;
     }
+    return;
+  }
+
+  /* 拖动中：把当前点夹进窗口 —— 指针拖出窗口时框贴边停住，而不是飞走 */
+  s->current_px = lum_vec2_create(rts__clampf(mouse.position.x, 0.0f, window_size.x),
+                                  rts__clampf(mouse.position.y, 0.0f, window_size.y));
+
+  if (!mouse.left_down) {
+    s->dragging = false;
+    float dx = s->current_px.x - s->start_px.x;
+    float dy = s->current_px.y - s->start_px.y;
+    s->pending = true;
+    s->pending_is_click = (dx * dx + dy * dy) < (Rts_Selection_Click_Slop * Rts_Selection_Click_Slop);
+    s->pending_point_px = s->current_px;
   }
 }
 

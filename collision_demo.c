@@ -535,14 +535,14 @@ static void scene_build(Demo_mode mode) {
 
 /* ---------------- 绘制 ---------------- */
 
-/* Screen 阶段的 VP 已经是「像素空间、左上原点」（见 lum_application.c 的 Screen 分支：
-   ortho(0, sw, sh, 0)），所以文字位置直接给像素坐标即可。
-   这里原先多套了一层 lum_app_screen_to_world —— 那是【世界空间】换算，
-   会把文字推到画面外：实测 1120x680 下 screen_to_world(16,24) = (-544, 316)，
-   拿它当像素用则 NDC x = -1.971，整段 HUD 不可见。 */
+/* Screen 阶段的 VP 是 ortho(0, sw, sh, 0)（像素、左上原点、Y 向下），
+   而 lum_tr_draw_layer 画的是 Y 向上的世界空间文字 —— 用 lum_tr_draw_screen
+   让它做 Y 翻转 + 基线换算。
+   历史：这里曾错用 lum_app_screen_to_world（世界空间换算），整段 HUD 被推到
+   画面外（实测 1120x680 下 screen_to_world(16,24)=(-544,316)，NDC x=-1.97）。 */
 static void draw_text(const char* text, float sx, float sy, lum_Vec4 color) {
   if (!g_font) return;
-  lum_tr_draw_layer(g_font, text, lum_vec2_create(sx, sy), Layer_Hud, color);
+  lum_tr_draw_screen(g_font, text, lum_vec2_create(sx, sy), Layer_Hud, color);
 }
 
 static void draw_body(const Body* b, int32_t fill_layer) {

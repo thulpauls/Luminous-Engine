@@ -25,6 +25,14 @@ static lum_Vec2 screen_of_world(lum_Vec2 w) {
   return lum_vec2_create(WIN_W * 0.5f + w.x, WIN_H * 0.5f - w.y);
 }
 
+static rts_Mouse_state mouse_at(lum_Vec2 p, bool pressed, bool down) {
+  rts_Mouse_state m;
+  m.position = p;
+  m.left_pressed = pressed;
+  m.left_down = down;
+  return m;
+}
+
 static void box_select(rts_Selection* s, lum_Ecs* ecs, const lum_Camera2d* cam,
                        lum_Vec2 win, lum_Vec2 w0, lum_Vec2 w1) {
   rts_selection_init(s);
@@ -138,6 +146,55 @@ int main(void) {
     cam.zoom = 0.5f;
     box_select_screen(&s, ecs, &cam, win, lum_vec2_create(0, 0), lum_vec2_create(WIN_W, WIN_H));
     check("selected_count", s.selected_count, 4);
+    cam.zoom = 1.0f;
+  }
+
+  /* ---- 以下是输入状态机：拖拽序列与指针越界（用显式鼠标状态，故无需窗口）---- */
+
+  printf("\n[9] 完整拖拽序列（按下→移动→松开）应选中 (0,0) 那个\n");
+  {
+    lum_Vec2 from = screen_of_world(lum_vec2_create(-20, -20));   /* 左下 */
+    lum_Vec2 to   = screen_of_world(lum_vec2_create(30, 20));     /* 右上 */
+    lum_Vec2 mid  = lum_vec2_scale(lum_vec2_add(from, to), 0.5f);
+    rts_selection_init(&s);
+    rts_selection_input(&s, mouse_at(from, true, true),  win, false);   /* 按下 */
+    rts_selection_input(&s, mouse_at(mid,  false, true), win, false);   /* 拖动中 */
+    check("拖动中 dragging", (uint32_t)s.dragging, 1);
+    rts_selection_input(&s, mouse_at(to,   false, true), win, false);
+    rts_selection_input(&s, mouse_at(to,   false, false), win, false);  /* 松开 */
+    check("松开后 dragging", (uint32_t)s.dragging, 0);
+    check("pending 已置位", (uint32_t)s.pending, 1);
+    rts_selection_resolve(&s, ecs, &cam, win);
+    check("selected_count", s.selected_count, 1);
+  }
+
+  printf("\n[10] 指针被拖到窗口外：端点应夹到窗口边界，仍能选中全屏内 3 个\n");
+  {
+    rts_selection_init(&s);
+    rts_selection_input(&s, mouse_at(lum_vec2_create(0, 0), true, true), win, false);
+    /* 越界坐标（实测真实环境里拿到过 (1996,1218)，而窗口只有 1280x720） */
+    rts_selection_input(&s, mouse_at(lum_vec2_create(1996.0f, 1218.0f), false, true), win, false);
+    check("current 被夹到窗口右下",
+          (uint32_t)(s.current_px.x == WIN_W && s.current_px.y == WIN_H), 1);
+    rts_selection_input(&s, mouse_at(lum_vec2_create(1996.0f, 1218.0f), false, false), win, false);
+    rts_selection_resolve(&s, ecs, &cam, win);
+    check("selected_count", s.selected_count, 3);
+  }
+
+  printf("\n[11] 指针在窗口外按下：不应起手\n");
+  {
+    rts_selection_init(&s);
+    rts_selection_input(&s, mouse_at(lum_vec2_create(1996.0f, 1218.0f), true, true), win, false);
+    check("dragging 应保持 0", (uint32_t)s.dragging, 0);
+  }
+
+  printf("\n[12] 位移小于 slop 算单击而不是框选\n");
+  {
+    rts_selection_init(&s);
+    rts_selection_input(&s, mouse_at(lum_vec2_create(640, 360), true, true), win, false);
+    rts_selection_input(&s, mouse_at(lum_vec2_create(641, 361), false, true), win, false);
+    rts_selection_input(&s, mouse_at(lum_vec2_create(641, 361), false, false), win, false);
+    check("pending_is_click", (uint32_t)s.pending_is_click, 1);
   }
 
   lum_ecs_destroy(ecs);
