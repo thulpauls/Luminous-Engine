@@ -1,6 +1,6 @@
 #include "containers/lum_vector.h"
-#include "lum_assert.h"
-#include "lum_log.h"
+#include "glimmer/lum_assert.h"
+#include "glimmer/lum_log.h"
 #include <stdlib.h>
 #include <string.h>
 

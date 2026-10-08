@@ -35,7 +35,7 @@
 
 - 字形表是 `lum_Glyph glyphs[128]`，单页图集，`preload_ascii` 也只预载 `[32,127)`
 - 代码中对每个字符只有一句 `Lum_Assert(c < 128)`
-  （`src/lum_text_renderer.c:193` 与 `:257`），**后面紧跟 `&tr->glyphs[c]`**
+  （`src/glimmer/lum_text_renderer.c:193` 与 `:257`），**后面紧跟 `&tr->glyphs[c]`**
 
 **【违反后果】** 传入非 ASCII 字节（例如任何中文字符串）：
 

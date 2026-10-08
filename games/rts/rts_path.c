@@ -11,6 +11,9 @@
 *   - 二叉堆 + 惰性删除：重复入堆的旧条目在弹出时靠 s_done 判掉，
 *     不需要 decrease-key（也就没有"节点在哪"的反查表）
 *   - 每格最多被松弛 8 次（八邻居各一次），所以堆容量取 10 倍格数就绝不溢出
+*
+* 这些数组是【跨调用保留】的：增量用法下，推进到一半的两张表要能随时被查出来画图，
+* 所以不能在某次搜索结束时清掉；同一份空间在下一次 begin 时靠代次号自动作废。
 */
 
 #define Rts_Path_Heap_Cap (Rts_Nav_Max_Cells * 10)
@@ -19,8 +22,8 @@
 static float    s_g[Rts_Nav_Max_Cells];        /* 从起点走到该格的实际代价 */
 static float    s_f[Rts_Nav_Max_Cells];        /* g + 启发式（堆的排序键） */
 static int32_t  s_from[Rts_Nav_Max_Cells];     /* 前驱格，用来回溯 */
-static uint32_t s_stamp[Rts_Nav_Max_Cells];    /* == s_gen 表示 g/f 有效 */
-static uint32_t s_done[Rts_Nav_Max_Cells];     /* == s_gen 表示已关闭（不再松弛） */
+static uint32_t s_stamp[Rts_Nav_Max_Cells];    /* == s_gen 表示 g/f 有效（被碰过） */
+static uint32_t s_done[Rts_Nav_Max_Cells];     /* == s_gen 表示已定案（closed） */
 static uint32_t s_gen = 0;
 
 static int32_t  s_heap[Rts_Path_Heap_Cap];
@@ -28,6 +31,7 @@ static int32_t  s_heap_size = 0;
 
 static int32_t  s_cells[Rts_Nav_Max_Cells];    /* 回溯出来的格子路径 */
 static lum_Vec2 s_cand[Rts_Nav_Max_Cells + 1]; /* 拉直前的候选点 */
+static uint32_t s_last_expanded = 0;           /* 最近一次搜索定案了多少格（诊断用） */
 
 /* 八邻居。前 4 个正交（代价 1），后 4 个对角（代价 √2） */
 static const int32_t kDX[8] = {  1, -1,  0,  0,  1,  1, -1, -1 };
@@ -91,102 +95,137 @@ static inline bool rts__passable(const rts_Navgrid* nav, int32_t cx, int32_t cy,
   return !rts_navgrid_blocked(nav, cx, cy);
 }
 
-/* ---------- 搜索，结果写进 s_cells，返回格子数 ---------- */
+/* ---------- 展开一个已经定案的格子（把它的邻居松弛一遍） ---------- */
 
-static int32_t rts__search(const rts_Navgrid* nav, int32_t scx, int32_t scy,
-                          int32_t gcx, int32_t gcy) {
+static void rts__expand(const rts_Navgrid* nav, const rts_Path_search* s, int32_t cur) {
+  const int32_t cx = cur % Rts_Nav_Cells_X;
+  const int32_t cy = cur / Rts_Nav_Cells_X;
+
+  for (int32_t k = 0; k < 8; ++k) {
+    const int32_t nx = cx + kDX[k];
+    const int32_t ny = cy + kDY[k];
+    if (!rts__passable(nav, nx, ny, s->scx, s->scy)) continue;
+
+    if (k >= 4) {
+      /* 对角：两个正交邻居都必须可通行。
+         少了这条，路径会从两个被堵格子的"角"上斜着穿过去，看着就是穿墙。
+         （实测：去掉这两行后 [31] 的长度断言立刻从 192 掉到 135.76 —— 就是穿角捷径） */
+      if (!rts__passable(nav, cx + kDX[k], cy, s->scx, s->scy)) continue;
+      if (!rts__passable(nav, cx, cy + kDY[k], s->scx, s->scy)) continue;
+    }
+
+    const int32_t n = ny * Rts_Nav_Cells_X + nx;
+    if (s_done[n] == s_gen) continue;
+
+    if (s_stamp[n] != s_gen) { s_stamp[n] = s_gen; s_g[n] = 1e30f; }
+
+    const float ng = s_g[cur] + ((k >= 4) ? RTS_SQRT2 : 1.0f);
+    if (ng < s_g[n]) {
+      s_g[n] = ng;
+      s_f[n] = ng + rts__h(nx, ny, s->gcx, s->gcy);
+      s_from[n] = cur;
+      rts__heap_push(n);
+    }
+  }
+}
+
+/* ---------- 对外：增量推进 ---------- */
+
+bool rts_path_search_begin(const rts_Navgrid* nav, lum_Vec2 from, lum_Vec2 to,
+                           rts_Path_search* out) {
+  if (!nav || !out) return false;
+  *out = (rts_Path_search){0};
+
+  int32_t scx = 0, scy = 0;
+  if (!rts_navgrid_world_to_cell(from, &scx, &scy)) return false;   /* 起点在网格外 */
+
+  /* 终点夹到最近的可通行格。夹完的点要回传给调用方当最终目标 ——
+     否则调用方会永远够不到原始目标，每步都重规划。 */
+  const lum_Vec2 goal = rts_navgrid_clamp_to_free(nav, to);
+  int32_t gcx = 0, gcy = 0;
+  if (!rts_navgrid_world_to_cell(goal, &gcx, &gcy)) return false;
+  if (rts_navgrid_blocked(nav, gcx, gcy)) return false;             /* 整张图被堵死 */
+
   ++s_gen;
   if (s_gen == 0u) {                          /* 代次回绕：清一次再从 1 开始 */
     for (int32_t i = 0; i < Rts_Nav_Max_Cells; ++i) { s_stamp[i] = 0; s_done[i] = 0; }
     s_gen = 1u;
   }
   s_heap_size = 0;
+  s_last_expanded = 0;
+
+  out->active = true;
+  out->from = from;
+  out->goal = goal;
+  out->scx = scx; out->scy = scy;
+  out->gcx = gcx; out->gcy = gcy;
+  out->current = -1;                          /* 还没定案任何格 */
 
   const int32_t start = scy * Rts_Nav_Cells_X + scx;
-  const int32_t goal  = gcy * Rts_Nav_Cells_X + gcx;
-
   s_stamp[start] = s_gen;
   s_g[start] = 0.0f;
   s_f[start] = rts__h(scx, scy, gcx, gcy);
   s_from[start] = -1;
   rts__heap_push(start);
 
-  while (s_heap_size > 0) {
-    const int32_t cur = rts__heap_pop();
-    if (s_done[cur] == s_gen) continue;       /* 惰性删除：旧条目，已经有更好的 g 了 */
-    s_done[cur] = s_gen;
-
-    if (cur == goal) break;
-
-    const int32_t cx = cur % Rts_Nav_Cells_X;
-    const int32_t cy = cur / Rts_Nav_Cells_X;
-
-    for (int32_t k = 0; k < 8; ++k) {
-      const int32_t nx = cx + kDX[k];
-      const int32_t ny = cy + kDY[k];
-      if (!rts__passable(nav, nx, ny, scx, scy)) continue;
-
-      if (k >= 4) {
-        /* 对角：两个正交邻居都必须可通行。
-           少了这条，路径会从两个被堵格子的"角"上斜着穿过去，看着就是穿墙。 */
-        if (!rts__passable(nav, cx + kDX[k], cy, scx, scy)) continue;
-        if (!rts__passable(nav, cx, cy + kDY[k], scx, scy)) continue;
-      }
-
-      const int32_t n = ny * Rts_Nav_Cells_X + nx;
-      if (s_done[n] == s_gen) continue;
-
-      if (s_stamp[n] != s_gen) { s_stamp[n] = s_gen; s_g[n] = 1e30f; }
-
-      const float ng = s_g[cur] + ((k >= 4) ? RTS_SQRT2 : 1.0f);
-      if (ng < s_g[n]) {
-        s_g[n] = ng;
-        s_f[n] = ng + rts__h(nx, ny, gcx, gcy);
-        s_from[n] = cur;
-        rts__heap_push(n);
-      }
-    }
-  }
-
-  if (s_done[goal] != s_gen) return 0;        /* 没走到终点 = 无路 */
-
-  int32_t n = 0;
-  for (int32_t c = goal; c != -1; c = s_from[c]) {
-    if (n >= Rts_Nav_Max_Cells) break;
-    s_cells[n++] = c;
-  }
-  for (int32_t i = 0; i < n / 2; ++i) {       /* 反转成 起点 → 终点 */
-    const int32_t t = s_cells[i];
-    s_cells[i] = s_cells[n - 1 - i];
-    s_cells[n - 1 - i] = t;
-  }
-  return n;
+  /* 注意：起点就是终点的情况不做特判。第一次 step 会把它定案并判定"找到"，
+     这样"步数"与"定案格数"的语义在两种情况下都保持一致。 */
+  return true;
 }
 
-/* ---------- 对外 ---------- */
+void rts_path_search_step(const rts_Navgrid* nav, rts_Path_search* s) {
+  if (!nav || !s || !s->active || s->finished) return;
 
-bool rts_path_find(const rts_Navgrid* nav, lum_Vec2 from, lum_Vec2 to, rts_Path* out) {
-  if (!out) return false;
+  /* 循环是为了让"一步"永远等于"定案一个格子" ——
+     堆里可能躺着已经作废的旧条目（惰性删除），弹出它们不算干活。 */
+  for (;;) {
+    if (s_heap_size <= 0) { s->finished = true; s->found = false; return; }
+
+    const int32_t cur = rts__heap_pop();
+    if (s_done[cur] == s_gen) continue;       /* 旧条目：已经有更好的 g 了，跳过 */
+
+    s_done[cur] = s_gen;
+    s->current = cur;                         /* "前沿刚刚走到哪一格" */
+    ++s->expanded;
+    ++s->steps;
+    s_last_expanded = s->expanded;
+
+    if (cur == s->gcy * Rts_Nav_Cells_X + s->gcx) {
+      s->finished = true;
+      s->found = true;
+      return;
+    }
+
+    rts__expand(nav, s, cur);
+    return;
+  }
+}
+
+bool rts_path_search_take(const rts_Navgrid* nav, const rts_Path_search* s, rts_Path* out) {
+  if (!nav || !s || !out) return false;
   out->count = 0;
   out->truncated = 0;
-  if (!nav) return false;
+  if (!s->finished || !s->found) return false;
 
-  int32_t scx = 0, scy = 0;
-  if (!rts_navgrid_world_to_cell(from, &scx, &scy)) return false;   /* 起点在网格外 */
+  /* 回溯出格子路径（从终点倒着收到起点），再反转 */
+  int32_t n = 0;
+  {
+    const int32_t goal = s->gcy * Rts_Nav_Cells_X + s->gcx;
+    for (int32_t c = goal; c != -1; c = s_from[c]) {
+      if (n >= Rts_Nav_Max_Cells) break;
+      s_cells[n++] = c;
+    }
+    for (int32_t i = 0; i < n / 2; ++i) {
+      const int32_t t = s_cells[i];
+      s_cells[i] = s_cells[n - 1 - i];
+      s_cells[n - 1 - i] = t;
+    }
+  }
+  if (n <= 0) return false;
 
-  /* 终点夹到最近的可通行格。夹完的点要回传给调用方当最终目标 ——
-     否则单位会永远够不到原始目标，每帧重规划。 */
-  const lum_Vec2 goal = rts_navgrid_clamp_to_free(nav, to);
-  int32_t gcx = 0, gcy = 0;
-  if (!rts_navgrid_world_to_cell(goal, &gcx, &gcy)) return false;
-  if (rts_navgrid_blocked(nav, gcx, gcy)) return false;             /* 整张图被堵死 */
-
-  const int32_t ncell = rts__search(nav, scx, scy, gcx, gcy);
-  if (ncell <= 0) return false;
-
-  if (ncell == 1) {
+  if (n == 1) {
     /* 起终点同格：直接一个路点（夹后的终点） */
-    out->points[0] = goal;
+    out->points[0] = s->goal;
     out->count = 1;
     return true;
   }
@@ -194,8 +233,8 @@ bool rts_path_find(const rts_Navgrid* nav, lum_Vec2 from, lum_Vec2 to, rts_Path*
   /* 组装候选点。第 0 个用【单位真实位置】而不是起点格中心 ——
      否则单位会先退回去对齐格心，看着像"起步时抖一下"。 */
   int32_t m = 0;
-  s_cand[m++] = from;
-  for (int32_t i = 1; i < ncell; ++i) {
+  s_cand[m++] = s->from;
+  for (int32_t i = 1; i < n; ++i) {
     s_cand[m++] = rts_navgrid_cell_center(s_cells[i] % Rts_Nav_Cells_X,
                                           s_cells[i] / Rts_Nav_Cells_X);
   }
@@ -214,4 +253,45 @@ bool rts_path_find(const rts_Navgrid* nav, lum_Vec2 from, lum_Vec2 to, rts_Path*
     i = best;
   }
   return out->count > 0;
+}
+
+bool rts_path_find(const rts_Navgrid* nav, lum_Vec2 from, lum_Vec2 to, rts_Path* out) {
+  if (!out) return false;
+  rts_Path_search s;
+  if (!rts_path_search_begin(nav, from, to, &s)) {
+    out->count = 0;
+    out->truncated = 0;
+    return false;
+  }
+  while (!s.finished) rts_path_search_step(nav, &s);
+  return rts_path_search_take(nav, &s, out);
+}
+
+/* ---------- 诊断 / 可视化查询 ---------- */
+
+uint32_t rts_path_last_expanded(void) {
+  return s_last_expanded;
+}
+
+bool rts_path_last_visited(int32_t cx, int32_t cy) {
+  if (cx < 0 || cy < 0 || cx >= Rts_Nav_Cells_X || cy >= Rts_Nav_Cells_Y) return false;
+  if (s_gen == 0u) return false;   /* 还没跑过任何搜索 */
+  return s_done[cy * Rts_Nav_Cells_X + cx] == s_gen;
+}
+
+bool rts_path_last_open(int32_t cx, int32_t cy) {
+  if (cx < 0 || cy < 0 || cx >= Rts_Nav_Cells_X || cy >= Rts_Nav_Cells_Y) return false;
+  if (s_gen == 0u) return false;
+  const int32_t i = cy * Rts_Nav_Cells_X + cx;
+  return s_stamp[i] == s_gen && s_done[i] != s_gen;
+}
+
+bool rts_path_last_costs(int32_t cx, int32_t cy, float* out_g, float* out_h) {
+  if (cx < 0 || cy < 0 || cx >= Rts_Nav_Cells_X || cy >= Rts_Nav_Cells_Y) return false;
+  if (s_gen == 0u) return false;
+  const int32_t i = cy * Rts_Nav_Cells_X + cx;
+  if (s_stamp[i] != s_gen) return false;      /* 这一格本次搜索没碰过 */
+  if (out_g) *out_g = s_g[i];
+  if (out_h) *out_h = s_f[i] - s_g[i];        /* 实现里只存 g 和 f = g + h */
+  return true;
 }

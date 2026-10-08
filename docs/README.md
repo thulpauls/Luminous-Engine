@@ -6,7 +6,8 @@
 2. `CONTRACT.md` —— 跨模块语义契约（线程模型 / 失败语义 / 所有权 / 坐标系与单位 / 枚举稳定性）
 3. `versioning.md` —— 编号策略
 4. `modules/*.md` —— 逐层参考
-5. `../include/*.h` —— 逐符号契约
+5. `design/*.md` —— 施工大纲（当前：3D 渲染器分期路线，后续开发参照执行）
+6. `../include/*.h` —— 逐符号契约
 
 ## 写作约定
 
@@ -23,16 +24,17 @@
 |---|---|---|
 | [`architecture.md`](architecture.md) | 分层与模块总览 | ✅ |
 | [`CONTRACT.md`](CONTRACT.md) | 跨模块语义契约（术语表 / 线程 / 失败 / 所有权 / ECS 指针失效 / 坐标系 / 枚举稳定性） | ✅ |
-| [`versioning.md`](versioning.md) | 三段式版本号、四个版本轴、依赖矩阵、tag 约定 | ✅ |
-| [`modules/base.md`](modules/base.md) | 基础层（version / log / assert / math2d / collision / vector / list） | ✅ |
-| [`modules/platform.md`](modules/platform.md) | 平台层（filesystem / window / input_codes / input / time） | ✅ |
-| [`modules/render.md`](modules/render.md) | 渲染层（renderer2d / shader / texture / atlas / camera / transform / material / render_target） | ✅ |
+| [`versioning.md`](versioning.md) | **两条版本线**（引擎 / glimmer 分开计数）、格式 `<阶段> <迭代次数>`、**兼容性矩阵**、四个版本轴、依赖矩阵、tag 约定 | ✅ |
+| [`modules/glimmer.md`](modules/glimmer.md) | **基础平台 glimmer**（数学 math2d/transform + 平台 log/assert/filesystem/window/input/time + 渲染器 renderer2d/shader/texture/material/render_target/atlas/camera/text_renderer；独立构建目标，**可脱离引擎单独运行**） | ✅ |
+| [`modules/base.md`](modules/base.md) | 引擎基础层（version / collision / vector / list）—— 数学与日志已并入 glimmer | ✅ |
+| [`modules/platform.md`](modules/platform.md) | 平台层（glimmer 的 filesystem / window / input_codes / input / time） | ✅ |
 | [`modules/assets.md`](modules/assets.md) | 资源层（assets 缓存） | ✅ |
 | [`modules/serial.md`](modules/serial.md) | 序列化层（Archive + 字段表） | ✅ |
 | [`modules/scene.md`](modules/scene.md) | 场景层（ecs / scene / scene_io） | ✅ |
 | [`modules/components.md`](modules/components.md) | 内置扩展组件（glow / beam 实体组件） | ✅ |
 | [`modules/effects.md`](modules/effects.md) | 特效（glow / beam 即时绘制） | ✅ |
-| [`modules/subsystem.md`](modules/subsystem.md) | 子系统（text_renderer / ui） | ✅ |
+| [`modules/subsystem.md`](modules/subsystem.md) | 子系统（ui；text_renderer 已并入 glimmer） | ✅ |
+| [`design/glimmer3d.md`](design/glimmer3d.md) | **施工大纲**：3D 渲染器分期路线（M1 最简渲染器 → M9 与 2D 合成），含每期代码规模、验收判据、施工流程与进度台账 —— **后续开发参照执行** | 执行中（**M1~M3 已完成**：M1 = 深度 A/B；M2 = 实例化，提交耗时降 169×/573×；M3 = 材质与 sRGB，批次数 = 材质数（4096 物体 → 4 次 draw call）） |
 | [`research/spring-recoil-skirmish-ai-contract.md`](research/spring-recoil-skirmish-ai-contract.md) | **外部调研**（非本引擎）：Recoil/Spring Skirmish AI 接口契约与"托管 AI 所需的最小引擎能力"清单 | 参考 |
 | `tools/api-coverage.ps1` | 列出缺注释的公开符号 | 待写（非 markdown） |
 

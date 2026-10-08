@@ -1,6 +1,6 @@
 #include "components/lum_component_glow.h"
 #include "effects/lum_glow.h"
-#include "lum_renderer2d.h"
+#include "glimmer/lum_renderer2d.h"
 #include "lum_serial.h"
 
 /* 组件 id 缓存：register 时填入；引擎默认单世界（lum_app 持有一个 ecs），

@@ -1,14 +1,14 @@
 #include "lum_application.h"
-#include "lum_window.h"
-#include "lum_input.h"
-#include "lum_time.h"
-#include "lum_renderer2d.h"
-#include "lum_render_target.h"
+#include "glimmer/lum_window.h"
+#include "glimmer/lum_input.h"
+#include "glimmer/lum_time.h"
+#include "glimmer/lum_renderer2d.h"
+#include "glimmer/lum_render_target.h"
 #include "lum_scene.h"
 #include "lum_assets.h"
 #include "effects/lum_effects.h"
 #include "containers/lum_vector.h"
-#include "lum_assert.h"
+#include "glimmer/lum_assert.h"
 #include <string.h>
 
 /* ============================================================================

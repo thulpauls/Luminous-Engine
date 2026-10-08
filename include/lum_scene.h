@@ -2,10 +2,10 @@
 #define Lum_Scene_H
 
 #include "lum_ecs.h"
-#include "lum_math2d.h"
-#include "lum_texture.h"
-#include "lum_camera.h"
-#include "lum_render_target.h"
+#include "glimmer/lum_math2d.h"
+#include "glimmer/lum_texture.h"
+#include "glimmer/lum_camera.h"
+#include "glimmer/lum_render_target.h"
 #include <stdbool.h>
 
 struct lum_Context;             /* 引擎系统签名需要；完整定义在 lum_application.h（避免循环包含） */

@@ -1,11 +1,11 @@
 #include "lum_scene.h"
 #include "lum_application.h"   /* lum_Context / lum_Stage / lum_app_add_system */
-#include "lum_transform.h"
-#include "lum_renderer2d.h"
-#include "lum_render_target.h"
+#include "glimmer/lum_transform.h"
+#include "glimmer/lum_renderer2d.h"
+#include "glimmer/lum_render_target.h"
 #include "containers/lum_vector.h"
-#include "lum_assert.h"
-#include "lum_log.h"
+#include "glimmer/lum_assert.h"
+#include "glimmer/lum_log.h"
 #include <math.h>
 #include <string.h>
 

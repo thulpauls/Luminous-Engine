@@ -1,6 +1,6 @@
 #include "effects/lum_effects.h"
-#include "lum_log.h"
-#include "lum_assert.h"
+#include "glimmer/lum_log.h"
+#include "glimmer/lum_assert.h"
 #include <string.h>
 
 typedef struct lum_Effects {

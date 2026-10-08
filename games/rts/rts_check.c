@@ -2,6 +2,7 @@
    不需要 GL、不需要窗口 —— 直接建 ECS、跑一步步进（含 Transform）再结算选择。
    移动指令直接调 rts_orders_* 并把 dt 显式传进去，所以每一步的位移都是确定的。 */
 #include "luminous.h"
+#include "rts_collision.h"
 #include "rts_navgrid.h"
 #include "rts_orders.h"
 #include "rts_path.h"
@@ -30,6 +31,16 @@ static void checkf(const char* what, float got, float want, float tol) {
   if (!ok) ++g_fail;
   printf("  %-46s got %.4f  want %.4f (±%.4f)   %s\n", what, (double)got,
          (double)want, (double)tol, ok ? "ok" : "★FAIL★");
+}
+
+/* 自算一份 octile（八向网格的精确距离，单位 = 格），用来独立验证实现发出来的 h。
+   刻意在测试里重写一遍公式，而不是调实现内部的 rts__h —— 否则等于拿实现验实现。 */
+static float octile_cells(int32_t ax, int32_t ay, int32_t bx, int32_t by) {
+  const int32_t dx = (ax > bx) ? (ax - bx) : (bx - ax);
+  const int32_t dy = (ay > by) ? (ay - by) : (by - ay);
+  const int32_t mn = (dx < dy) ? dx : dy;
+  const int32_t mx = (dx < dy) ? dy : dx;
+  return (float)(mx - mn) + 1.41421356f * (float)mn;
 }
 
 /* ---------- 移动指令用的小工具 ---------- */
@@ -718,6 +729,476 @@ int main(void) {
     checkf("路长 == 直线距离", path_length(&u->path, t->position),
            sqrtf((to.x - t->position.x) * (to.x - t->position.x) +
                  (to.y - t->position.y) * (to.y - t->position.y)), 0.001f);
+  }
+
+  printf("\n[31] 禁止切角：对角邻格被堵时不许斜穿（否则会走穿角捷径）\n");
+  {
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);
+    /* 手工【只堵两格】—— 绕开膨胀那一圈，才能造出"斜线正好从两格夹角上过"的局面。
+       (2,1) 与 (1,2) 斜对角相邻，而 (1,1)↔(2,2) 的斜线正好穿过它们夹的那个角。
+       这两格本身都不在任何 A* 直线上，所以【只有"禁止切角"这条规则能挡住它】。 */
+    nav.blocked[1 * Rts_Nav_Cells_X + 2] = 1;   /* (2,1) */
+    nav.blocked[2 * Rts_Nav_Cells_X + 1] = 1;   /* (1,2) */
+
+    const lum_Vec2 start = rts_navgrid_cell_center(0, 0);
+    const lum_Vec2 goal = rts_navgrid_cell_center(3, 3);
+    rts_Path p;
+    check("有路可走", (uint32_t)rts_path_find(&nav, start, goal, &p), 1);
+
+    const float len = path_length(&p, start);
+    const float shortcut = sqrtf(18.0f) * Rts_Nav_Cell_Size;   /* 直穿 (0,0)→(3,3) = 3√2 格 */
+    printf("      路点 %u 个，全长 %.2f（穿角捷径只要 %.2f）\n",
+           (unsigned)p.count, (double)len, (double)shortcut);
+    checkf("绕开夹角：全长 == 6 格", len, 6.0f * Rts_Nav_Cell_Size, 0.5f);
+    check("明显长于穿角捷径", (uint32_t)(len > shortcut + 40.0f), 1);
+
+    /* 每段按 1 世界单位密集采样，任何一点都不得落在被堵的那两格里 */
+    uint32_t bad = 0;
+    lum_Vec2 prev = start;
+    for (uint8_t i = 0; i < p.count; ++i) {
+      const float dx = p.points[i].x - prev.x;
+      const float dy = p.points[i].y - prev.y;
+      const int32_t steps = (int32_t)sqrtf(dx * dx + dy * dy) + 1;
+      for (int32_t k = 0; k <= steps; ++k) {
+        const float t = (float)k / (float)steps;
+        int32_t cx = -1, cy = -1;
+        if (!rts_navgrid_world_to_cell(lum_vec2_create(prev.x + dx * t, prev.y + dy * t),
+                                       &cx, &cy)) { ++bad; continue; }
+        if (rts_navgrid_blocked(&nav, cx, cy)) ++bad;
+      }
+      prev = p.points[i];
+    }
+    check("逐点采样：没有一步落在 (2,1)/(1,2) 上", bad, 0);
+
+    /* 对照组：把这两格放开，就该允许直穿 —— 全长退回 3√2 格。
+       有了这个对照，"192" 才能被解释成"因为禁止切角而绕路"，而不是随便一个数。 */
+    rts_Navgrid open_nav;
+    rts_navgrid_init(&open_nav);
+    rts_Path po;
+    check("放开后仍能找到路", (uint32_t)rts_path_find(&open_nav, start, goal, &po), 1);
+    printf("      放开后全长 %.2f（= 3√2 格，直穿）\n", (double)path_length(&po, start));
+    checkf("放开后就是直穿", path_length(&po, start), shortcut, 0.5f);
+  }
+
+  printf("\n[32] 启发式真的在省事：定案格数远小于总格数\n");
+  {
+    /* 这一条盯的是"路径依然正确、但启发式被写坏"的情形。
+       把 h 改成恒 0 就是 Dijkstra：路径照样最优，前面所有测试照样全绿，
+       只有"定案了多少格"会暴涨。没有这个读数，这种退化查不出来。 */
+    rts_Navgrid nav;
+    nav_wall(&nav);
+    rts_Path p;
+
+    /* 远距离 + 要绕墙：A* 应当只探索"朝终点的一条带" */
+    const lum_Vec2 far_from = lum_vec2_create(-900.0f, -900.0f);
+    const lum_Vec2 far_to   = lum_vec2_create( 900.0f,  900.0f);
+    check("远距离仍能找到路", (uint32_t)rts_path_find(&nav, far_from, far_to, &p), 1);
+    const uint32_t expanded_far = rts_path_last_expanded();
+    printf("      远距离：定案 %u / %d 格（%.1f%%）\n", (unsigned)expanded_far,
+           Rts_Nav_Max_Cells, (double)expanded_far * 100.0 / (double)Rts_Nav_Max_Cells);
+    check("定案数远小于总格数（< 40%）",
+          (uint32_t)(expanded_far * 100u < (uint32_t)Rts_Nav_Max_Cells * 40u), 1);
+
+    /* 真正没有障碍的一小段：西侧 (-200,0) → (-120,0)，墙在东边，一路畅通。
+       注意别拿"横跨墙两侧"的一对点当近距离用例 —— 那其实要北上绕一大圈，
+       定案几百格才是对的。我第一版就是这么写错的，被下面这条断言抓出来。 */
+    const lum_Vec2 near_from = lum_vec2_create(-200.0f, 0.0f);
+    const lum_Vec2 near_to   = lum_vec2_create(-120.0f, 0.0f);
+    check("近距离仍能找到路", (uint32_t)rts_path_find(&nav, near_from, near_to, &p), 1);
+    const uint32_t expanded_near = rts_path_last_expanded();
+    printf("      近距离：定案 %u 格\n", (unsigned)expanded_near);
+    check("近距离定案数 < 200", (uint32_t)(expanded_near < 200u), 1);
+    check("远距离比近距离探索得多（符合直觉）",
+          (uint32_t)(expanded_far > expanded_near), 1);
+  }
+
+  printf("\n[33] 单位互斥：两个压住对方的箱子被对称推开到刚好接触\n");
+  {
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);          /* 全空网格：只测单位之间，不带墙 */
+    reset_selection_and_orders(ecs);
+
+    place_unit_at(ecs, 0, lum_vec2_create(0.0f, 0.0f));
+    place_unit_at(ecs, 1, lum_vec2_create(10.0f, 0.0f));   /* 边长 20，中心距 10 → 压了 10 */
+
+    lum_Component_transform* t0; rts_Unit* u0;
+    lum_Component_transform* t1; rts_Unit* u1;
+    unit_by_index(ecs, 0, &t0, &u0);
+    unit_by_index(ecs, 1, &t1, &u1);
+
+    check("这一帧确实推了东西", (uint32_t)(rts_collision_resolve(ecs, &nav) > 0), 1);
+    unit_by_index(ecs, 0, &t0, &u0);
+    unit_by_index(ecs, 1, &t1, &u1);
+
+    /* 最小重叠轴是 x（重叠 10），所以推力沿 x；两边各承担一半 = 各 5。
+       这一条同时钉死了引擎的 depth 语义：depth 是【整段】平移量，各推一半才对。
+       若误按"各推整个 depth"，这里会得到 -10 / 20。 */
+    checkf("A 被推向 -x，各推一半", t0->position.x, -5.0f, 0.01f);
+    checkf("B 被推向 +x，各推一半", t1->position.x, 15.0f, 0.01f);
+    checkf("中心距正好等于边长（刚好接触，不重叠）",
+           t1->position.x - t0->position.x, SIDE, 0.01f);
+    checkf("y 方向没有被动过", t0->position.y, 0.0f, 0.0001f);
+  }
+
+  printf("\n[34] 本来就没碰到的两个箱子，一点都不能动\n");
+  {
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);
+    reset_selection_and_orders(ecs);
+
+    place_unit_at(ecs, 0, lum_vec2_create(0.0f, 0.0f));
+    place_unit_at(ecs, 1, lum_vec2_create(30.0f, 0.0f));   /* 30 > 边长 20，分开的 */
+
+    lum_Component_transform* t0; rts_Unit* u0;
+    lum_Component_transform* t1; rts_Unit* u1;
+    unit_by_index(ecs, 0, &t0, &u0);
+    unit_by_index(ecs, 1, &t1, &u1);
+
+    check("一次都没推", rts_collision_resolve(ecs, &nav), 0);
+    checkf("A 原位", t0->position.x, 0.0f, 0.0001f);
+    checkf("B 原位", t1->position.x, 30.0f, 0.0001f);
+  }
+
+  printf("\n[35] 两个单位完全重合：不能算出 NaN，而且必须能分开\n");
+  {
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);
+    reset_selection_and_orders(ecs);
+
+    /* 圆心/箱心完全一致是最容易出 NaN 的退化情形（归一化除以 0） */
+    place_unit_at(ecs, 0, lum_vec2_create(40.0f, 40.0f));
+    place_unit_at(ecs, 1, lum_vec2_create(40.0f, 40.0f));
+
+    lum_Component_transform* t0; rts_Unit* u0;
+    lum_Component_transform* t1; rts_Unit* u1;
+
+    uint32_t guard = 0;
+    while (rts_collision_resolve(ecs, &nav) > 0 && guard < 200u) ++guard;
+    check("有限步内不再需要推", (uint32_t)(guard < 200u), 1);
+
+    unit_by_index(ecs, 0, &t0, &u0);
+    unit_by_index(ecs, 1, &t1, &u1);
+    check("A 坐标不是 NaN", (uint32_t)(!(isnan(t0->position.x) || isnan(t0->position.y))), 1);
+    check("B 坐标不是 NaN", (uint32_t)(!(isnan(t1->position.x) || isnan(t1->position.y))), 1);
+
+    const float dx = fabsf(t1->position.x - t0->position.x);
+    const float dy = fabsf(t1->position.y - t0->position.y);
+    check("已经分开（任一轴达到边长即可）",
+          (uint32_t)(dx >= SIDE - 0.06f || dy >= SIDE - 0.06f), 1);
+  }
+
+  printf("\n[36] 九个单位挤成一坨：收敛到两两不重叠，且稳定后逐位不变\n");
+  {
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);
+    reset_selection_and_orders(ecs);
+
+    /* 场上原本只有 4 个（前面那些用例已经跑完了，这里补单位不会影响它们） */
+    const lum_Vec4 spawn_col = lum_vec4_create(1, 1, 1, 1);
+    for (int k = 0; k < 5; ++k) {
+      if (rts_units_spawn(ecs, lum_vec2_create(0.0f, 0.0f), SIDE, spawn_col, 0, NULL) == Lum_Entity_Null) {
+        printf("  补单位失败\n");
+      }
+    }
+
+    /* 3×3 紧紧叠在一起：格距 6，远小于边长 20 */
+    uint32_t idx = 0;
+    for (int row = 0; row < 3; ++row) {
+      for (int col_i = 0; col_i < 3; ++col_i) {
+        place_unit_at(ecs, idx, lum_vec2_create((float)col_i * 6.0f, (float)row * 6.0f));
+        ++idx;
+      }
+    }
+    check("场上共 9 个单位", idx, 9);
+
+    uint32_t guard = 0;
+    while (rts_collision_resolve(ecs, &nav) > 0 && guard < 500u) ++guard;
+    check("有限步内收敛（不再需要推）", (uint32_t)(guard < 500u), 1);
+    check("再推一次已经无事可做", rts_collision_resolve(ecs, &nav), 0);
+
+    float px[9], py[9];
+    lum_Component_transform* t; rts_Unit* u;
+    for (uint32_t a = 0; a < 9; ++a) {
+      unit_by_index(ecs, a, &t, &u);
+      px[a] = t->position.x;
+      py[a] = t->position.y;
+    }
+
+    /* 箱子是轴对齐方形：把重叠判断写成"两轴都小于边长" */
+    uint32_t overlapping = 0;
+    for (uint32_t a = 0; a < 9; ++a) {
+      for (uint32_t b = a + 1; b < 9; ++b) {
+        if (fabsf(px[a] - px[b]) < SIDE - 0.06f && fabsf(py[a] - py[b]) < SIDE - 0.06f) ++overlapping;
+      }
+    }
+    check("九个单位两两不重叠", overlapping, 0);
+
+    /* 死区保证了真正的定点：没有可推的就一步都不动，逐位不变 */
+    for (int k = 0; k < 5; ++k) rts_collision_resolve(ecs, &nav);
+    uint32_t still = 0;
+    for (uint32_t a = 0; a < 9; ++a) {
+      unit_by_index(ecs, a, &t, &u);
+      if (t->position.x == px[a] && t->position.y == py[a]) ++still;
+    }
+    check("稳定后位置逐位不变（没有微抖）", still, 9);
+  }
+
+  printf("\n[37] 贴着墙被挤：宁可不动，也不能被推进被堵的格子里\n");
+  {
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);
+    /* 手工只堵一格（绕过膨胀）：格 (20,0) 覆盖世界 x ∈ [-384,-352]，y ∈ [-1024,-992] */
+    nav.blocked[0 * Rts_Nav_Cells_X + 20] = 1;
+    reset_selection_and_orders(ecs);
+
+    /* A 站在格 21 里、离左边界只差 1 个单位；B 在 A 右边 4 个单位处往左挤。
+       推力会把 A 往左推 8，正好越过边界进入被堵的格 20。 */
+    place_unit_at(ecs, 0, lum_vec2_create(-351.0f, -1008.0f));
+    place_unit_at(ecs, 1, lum_vec2_create(-347.0f, -1008.0f));
+
+    lum_Component_transform* t0; rts_Unit* u0;
+    lum_Component_transform* t1; rts_Unit* u1;
+
+    uint32_t in_wall = 0;
+    for (int k = 0; k < 40; ++k) {
+      rts_collision_resolve(ecs, &nav);
+      unit_by_index(ecs, 0, &t0, &u0);
+      int32_t cx = -1, cy = -1;
+      if (!rts_navgrid_world_to_cell(t0->position, &cx, &cy) ||
+          rts_navgrid_blocked(&nav, cx, cy)) ++in_wall;
+    }
+    check("A 全程没有一步落在被堵的格里", in_wall, 0);
+
+    unit_by_index(ecs, 0, &t0, &u0);
+    unit_by_index(ecs, 1, &t1, &u1);
+    /* 墙守卫不是"推不动就冻住"，而是"能推多少推多少，推到边界为止" ——
+       A 会贴着格 21 的左边界停住（-352 正好是边界，仍属格 21）。
+       这比冻住好：被挤的单位会朝墙压实，而不是原地僵住。 */
+    int32_t ax = -1, ay = -1;
+    check("A 仍在格 21（没越进被堵的格 20）",
+          (uint32_t)(rts_navgrid_world_to_cell(t0->position, &ax, &ay) && ax == 21), 1);
+    check("A 没有越过边界", (uint32_t)(t0->position.x >= -352.0f - 0.001f), 1);
+    checkf("A、B 仍然分开了（让步的是 B）",
+           fabsf(t1->position.x - t0->position.x), SIDE, 0.06f);
+  }
+
+  printf("\n[38] 单位已经陷在被堵格里时，必须还能被推出去（不能永久冻住）\n");
+  {
+    /* 这是集成探针抓出来的：把单位堆到墙里之后，重叠对数一动不动 ——
+       因为"不许推进被堵格"这条守卫把它自己的每一次推力都否决了。
+       修法和 A* 的"起点格豁免"同源：当前就在堵格里时，目的地一律放行。 */
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);
+    nav.blocked[0 * Rts_Nav_Cells_X + 20] = 1;   /* 只堵 (20,0)：世界 x ∈ [-384,-352] */
+
+    reset_selection_and_orders(ecs);
+    place_unit_at(ecs, 0, lum_vec2_create(-360.0f, -1000.0f));   /* 就在被堵的 (20,0) 里 */
+    place_unit_at(ecs, 1, lum_vec2_create(-350.0f, -1000.0f));   /* 相邻的空格 (21,0) */
+
+    lum_Component_transform* t0; rts_Unit* u0;
+    lum_Component_transform* t1; rts_Unit* u1;
+    unit_by_index(ecs, 0, &t0, &u0);
+    unit_by_index(ecs, 1, &t1, &u1);
+
+    int32_t cx = -1, cy = -1;
+    check("A 一开始确实在堵格里（前提成立）",
+          (uint32_t)(rts_navgrid_world_to_cell(t0->position, &cx, &cy) &&
+                     rts_navgrid_blocked(&nav, cx, cy)), 1);
+
+    const float before_x = t0->position.x;
+    uint32_t guard = 0;
+    while (rts_collision_resolve(ecs, &nav) > 0 && guard < 200u) ++guard;
+    unit_by_index(ecs, 0, &t0, &u0);
+    unit_by_index(ecs, 1, &t1, &u1);
+
+    check("A 没有被冻住（确实被推走了）",
+          (uint32_t)(t0->position.x != before_x), 1);
+    checkf("最终两者不再重叠", fabsf(t1->position.x - t0->position.x), SIDE, 0.06f);
+  }
+
+  printf("\n[39] 增量推进（begin/step/take）必须与一次跑完【逐位一致】\n");
+  {
+    rts_Navgrid nav;
+    nav_wall(&nav);
+    const lum_Vec2 from = lum_vec2_create(-200.0f, 0.0f);
+    const lum_Vec2 to   = lum_vec2_create(400.0f, 16.0f);
+
+    rts_Path once;
+    const bool ok_once = rts_path_find(&nav, from, to, &once);
+
+    rts_Path_search sh;
+    const bool ok_begin = rts_path_search_begin(&nav, from, to, &sh);
+    uint32_t guard = 0;
+    while (!sh.finished && guard < 100000u) { rts_path_search_step(&nav, &sh); ++guard; }
+    rts_Path inc;
+    const bool ok_take = rts_path_search_take(&nav, &sh, &inc);
+
+    check("begin 成功", (uint32_t)ok_begin, 1);
+    check("有限步内结束", (uint32_t)(guard < 100000u), 1);
+    check("一次跑完也成功", (uint32_t)ok_once, 1);
+    check("take 成功", (uint32_t)ok_take, 1);
+    check("路点数一致", inc.count, once.count);
+
+    uint32_t same = (inc.count == once.count) ? 1u : 0u;
+    for (uint8_t i = 0; i < inc.count; ++i) {
+      if (once.points[i].x != inc.points[i].x || once.points[i].y != inc.points[i].y) same = 0;
+    }
+    check("每个路点逐位相同", same, 1);
+    check("truncated 一致", inc.truncated, once.truncated);
+
+    /* 无路的情形也要一致：都要明确报失败，不许给半截路径 */
+    rts_Navgrid sealed;
+    rts_navgrid_init(&sealed);
+    for (int32_t y = 0; y < Rts_Nav_Cells_Y; ++y) sealed.blocked[y * Rts_Nav_Cells_X + 30] = 1;
+
+    rts_Path p1;
+    check("封死时一次跑完失败", (uint32_t)rts_path_find(&sealed, from, to, &p1), 0);
+
+    rts_Path_search s2;
+    if (rts_path_search_begin(&sealed, from, to, &s2)) {
+      uint32_t g2 = 0;
+      while (!s2.finished && g2 < 100000u) { rts_path_search_step(&sealed, &s2); ++g2; }
+      check("封死时增量也判定无路", (uint32_t)(s2.finished && !s2.found), 1);
+      rts_Path p2;
+      check("封死时 take 拒绝给路径", (uint32_t)rts_path_search_take(&sealed, &s2, &p2), 0);
+    } else {
+      check("封死时 begin 就失败（同样算正确）", 1, 1);
+      check("封死时 take 拒绝给路径", 1, 1);
+    }
+  }
+
+  printf("\n[40] “一步 = 定案一个格子”，且中途两张表都非空\n");
+  {
+    rts_Navgrid nav;
+    nav_wall(&nav);
+    rts_Path_search sh;
+    check("begin 成功", (uint32_t)rts_path_search_begin(&nav, lum_vec2_create(-200.0f, 0.0f),
+                                                       lum_vec2_create(400.0f, 16.0f), &sh), 1);
+    check("一开始 steps 为 0", sh.steps, 0);
+    check("一开始 expanded 为 0", sh.expanded, 0);
+    check("一开始起点在 open 表里", (uint32_t)rts_path_last_open(sh.scx, sh.scy), 1);
+    check("一开始起点不在 closed 表里", (uint32_t)rts_path_last_visited(sh.scx, sh.scy), 0);
+
+    uint32_t mismatch = 0;
+    for (uint32_t k = 0; k < 40; ++k) {
+      rts_path_search_step(&nav, &sh);
+      if (sh.steps != sh.expanded) ++mismatch;
+    }
+    check("40 步里 steps 始终 == expanded", mismatch, 0);
+    check("确实推进了 40 步", sh.steps, 40);
+
+    /* 中途两张表都得有东西，否则 demo 画不出"前沿" */
+    uint32_t nopen = 0, nclosed = 0;
+    for (int32_t cy = 0; cy < Rts_Nav_Cells_Y; ++cy) {
+      for (int32_t cx = 0; cx < Rts_Nav_Cells_X; ++cx) {
+        if (rts_path_last_open(cx, cy)) ++nopen;
+        if (rts_path_last_visited(cx, cy)) ++nclosed;
+      }
+    }
+    check("closed 的格子数 == expanded", nclosed, sh.expanded);
+    check("closed 非空", (uint32_t)(nclosed > 0u), 1);
+    check("open 非空", (uint32_t)(nopen > 0u), 1);
+
+    uint32_t guard = 0;
+    while (!sh.finished && guard < 100000u) { rts_path_search_step(&nav, &sh); ++guard; }
+    check("已结束", (uint32_t)sh.finished, 1);
+    check("找到路", (uint32_t)sh.found, 1);
+    check("终点在 closed 表里", (uint32_t)rts_path_last_visited(sh.gcx, sh.gcy), 1);
+    check("终点不在 open 表里", (uint32_t)rts_path_last_open(sh.gcx, sh.gcy), 0);
+    /* 注意不断言"open 表已空"：弹出终点就提前收工，堆里可能还剩没处理的格子 —— 这正是提前终止的体现 */
+  }
+
+  printf("\n[41] g / h 代价读数（可视化取的就是这两个数）\n");
+  {
+    rts_Navgrid nav;
+    rts_navgrid_init(&nav);                      /* 空地：代价应当正好是 octile */
+
+    rts_Path_search sh;
+    const lum_Vec2 from = rts_navgrid_cell_center(6, 6);
+    const lum_Vec2 to   = rts_navgrid_cell_center(12, 12);
+    check("begin 成功", (uint32_t)rts_path_search_begin(&nav, from, to, &sh), 1);
+
+    float g = -1.0f, h = -1.0f;
+    check("起点有代价读数", (uint32_t)rts_path_last_costs(6, 6, &g, &h), 1);
+    checkf("起点的 g 是 0", g, 0.0f, 0.0f);
+    checkf("起点的 h = 6√2", h, 6.0f * 1.41421356f, 1e-3f);
+
+    /* begin 只把起点入队：起点有读数，其它格子还没被碰过 */
+    check("起点在 open 表里", (uint32_t)rts_path_last_open(6, 6), 1);
+    check("begin 后邻格还没被碰过（无读数）", (uint32_t)rts_path_last_costs(7, 6, &g, &h), 0);
+
+    check("网格外的格子没有读数", (uint32_t)rts_path_last_costs(-1, 0, &g, &h), 0);
+    check("网格外的格子没有读数（上界）", (uint32_t)rts_path_last_costs(0, Rts_Nav_Cells_Y, &g, &h), 0);
+
+    rts_path_search_step(&nav, &sh);
+    check("第一步定案的是起点", (uint32_t)(sh.current == sh.scy * Rts_Nav_Cells_X + sh.scx), 1);
+    check("起点现在在 closed 表里", (uint32_t)rts_path_last_visited(6, 6), 1);
+    check("起点仍有代价读数", (uint32_t)rts_path_last_costs(6, 6, &g, &h), 1);
+    checkf("定案后 g 仍是 0", g, 0.0f, 0.0f);
+
+    /* 展开之后邻格进了 open：既没定案、又有 g/h —— 这正是 demo 画点的那些格子 */
+    check("展开后邻格在 open 表里", (uint32_t)rts_path_last_open(7, 6), 1);
+    check("展开后邻格有 g/h 读数", (uint32_t)rts_path_last_costs(7, 6, &g, &h), 1);
+    checkf("邻格的 g = 1", g, 1.0f, 1e-4f);
+    checkf("邻格的 h = 1 + 5√2", h, 1.0f + 5.0f * 1.41421356f, 1e-3f);
+
+    uint32_t guard = 0;
+    while (!sh.finished && guard < 100000u) { rts_path_search_step(&nav, &sh); ++guard; }
+    check("找到路", (uint32_t)sh.found, 1);
+
+    /* ① g 是【真实累计代价】而不是步数：纯对角的一步必须是 √2，不是 1 */
+    check("对角邻格已在 closed 表里", (uint32_t)rts_path_last_visited(7, 7), 1);
+    check("(7,7) 有代价读数", (uint32_t)rts_path_last_costs(7, 7, &g, &h), 1);
+    checkf("(7,7) 的 g = √2（不是步数 1）", g, 1.41421356f, 1e-4f);
+    checkf("(7,7) 的 h = 5√2", h, 5.0f * 1.41421356f, 1e-3f);
+    check("(7,7) 的 g < h（还在起点附近）", (uint32_t)(g < h), 1);
+
+    /* ② 终点：g = 6√2（空地直线），h = 0 */
+    check("终点有代价读数", (uint32_t)rts_path_last_costs(sh.gcx, sh.gcy, &g, &h), 1);
+    checkf("终点的 g = 6√2", g, 6.0f * 1.41421356f, 1e-3f);
+    checkf("终点的 h = 0", h, 0.0f, 1e-3f);
+
+    /* ③ 不变量：所有被碰过的格子，h 都必须等于到终点的 octile 距离。
+       这一条把"h 是启发式"钉死 —— 谁把 h 改成常数或算错，它立刻报。 */
+    uint32_t stamped = 0, h_bad = 0, g_neg = 0;
+    for (int32_t cy = 0; cy < Rts_Nav_Cells_Y; ++cy) {
+      for (int32_t cx = 0; cx < Rts_Nav_Cells_X; ++cx) {
+        if (!rts_path_last_open(cx, cy) && !rts_path_last_visited(cx, cy)) continue;
+        ++stamped;
+        if (!rts_path_last_costs(cx, cy, &g, &h)) { ++h_bad; continue; }
+        if (fabsf(h - octile_cells(cx, cy, sh.gcx, sh.gcy)) > 1e-3f) ++h_bad;
+        if (g < -1e-6f) ++g_neg;
+      }
+    }
+    check("被碰过的格子数 > 0", (uint32_t)(stamped > 0u), 1);
+    check("每一格的 h 都等于 octile 距离", h_bad, 0);
+    check("没有负的 g", g_neg, 0);
+
+    /* ④ 绕路时 g 必须大于直线 octile：证明它在数真实代价 */
+    rts_Navgrid walled;
+    nav_wall(&walled);
+    rts_Path_search sw;
+    check("有障碍时 begin 成功", (uint32_t)rts_path_search_begin(&walled, lum_vec2_create(-200.0f, 0.0f),
+                                                                 lum_vec2_create(400.0f, 16.0f), &sw), 1);
+    guard = 0;
+    while (!sw.finished && guard < 100000u) { rts_path_search_step(&walled, &sw); ++guard; }
+    check("有障碍时找到路", (uint32_t)sw.found, 1);
+    check("终点有代价读数", (uint32_t)rts_path_last_costs(sw.gcx, sw.gcy, &g, &h), 1);
+    const float straight_octile = octile_cells(sw.scx, sw.scy, sw.gcx, sw.gcy);
+    check("绕路后 g 明显大于直线 octile", (uint32_t)(g > straight_octile + 0.5f), 1);
+    checkf("绕路后终点的 h 仍为 0", h, 0.0f, 1e-3f);
+
+    /* ⑤ g 是"真实累计代价"的又一证据：空地直连时 g 必须正好等于 octile，
+       绕路时必须更大 —— 两件事同时成立，才说明它既不是步数也不是常数 */
+    rts_Path_search so;
+    check("空地 begin 成功", (uint32_t)rts_path_search_begin(&nav, rts_navgrid_cell_center(6, 6),
+                                                             rts_navgrid_cell_center(18, 6), &so), 1);
+    guard = 0;
+    while (!so.finished && guard < 100000u) { rts_path_search_step(&nav, &so); ++guard; }
+    check("空地找到路", (uint32_t)so.found, 1);
+    check("空地终点有读数", (uint32_t)rts_path_last_costs(so.gcx, so.gcy, &g, &h), 1);
+    checkf("空地横穿 12 格的 g = 12", g, 12.0f, 1e-4f);
   }
 
   lum_ecs_destroy(ecs);

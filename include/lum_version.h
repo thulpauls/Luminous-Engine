@@ -1,64 +1,78 @@
 #ifndef Lum_Version_H
 #define Lum_Version_H
 
+#include "glimmer/glimmer_version.h"   /* 兼容性声明要引用 glimmer 的版本常量，并在编译期校验 */
+
 /*
-* 版本号：三段式 ——  <开发阶段> <主要版本号>.<patch 版本号>
+* 引擎版本号 —— 格式：  <开发阶段> <迭代次数>          例：prototype 1
 *
-*   例：prototype 0.1
-*        ^^^^^^^^^   开发阶段标记（纯标签）
-*                    ^ 主要版本号
-*                      ^ patch 版本号
+* 引擎与 glimmer 【分开计数】：两条版本线各自迭代。本文件是引擎版本的唯一来源，
+* 同时声明【本引擎版本针对哪个 glimmer 版本开发】（见下方"兼容性声明"）。
 *
-* 本文件是版本号的【唯一来源】：CMake 在配置阶段读取它并据此填 project(VERSION)，
-* 不反向生成头文件 —— 因此不存在"构建脚本与头文件各写一份、悄悄跑偏"的情况。
+* CMake 在 project() 之前读取本文件与 include/glimmer/glimmer_version.h，据此填
+* project(VERSION) 并做一次配置期兼容检查 —— 不反向生成头文件，所以构建脚本与公共头
+* 不可能各写一份而悄悄跑偏。
 *
-* 比较规则（目前唯一一条）：
-*   - 只比较两段数字。**开发阶段标记完全不参与比较**：它只是给人看的成熟度标签，
-*     没有顺序语义，也无法用于 #if 的大小判断
-*   - 两段数字各自取 0..255（各占 8 位）
+* 比较规则：阶段在高位、迭代次数在低位，用 Lum_Version_Encode 打包后可在 #if 里比较。
+* 迭代次数在本阶段内递增；**阶段推进时从 1 重新开始**，因此跨阶段比较必须带上阶段。
 *
-* ⚠ 编号规则尚未定案：什么时候该动哪一段、以及"加功能但不破坏兼容"与"只修 bug"
-*   这两件事目前无法区分（都表现为 patch +1）。冻结时再补正式约定。
-*
-* 注：CMake 的 project(VERSION) 只接受数字，塞不进阶段词，因此喂给 CMake 的是
-*     `主要.patch` 两段（PROJECT_VERSION 形如 "0.1"），阶段标记单独作为一个变量。
+* ⚠ 编号规则仍是暂定的：什么算"一次迭代"、何时该推进阶段，见 docs/versioning.md
+*   的"已定 / 未定"表；冻结前会正式化。
 */
 
-/* ---------- 三段 ---------- */
+/* ---------- 阶段词表（数值有序；改这里要同步改阶段名串） ---------- */
 
-/* 开发阶段标记：纯标签，不参与比较、无顺序语义。
-   词表（仅文档约定，代码不校验）：prototype / alpha / beta / rc / release */
-#define Lum_Version_Stage "prototype"
+#define Lum_Version_Stage_Prototype 1
+#define Lum_Version_Stage_Alpha     2
+#define Lum_Version_Stage_Beta      3
+#define Lum_Version_Stage_Rc        4
+#define Lum_Version_Stage_Release   5
 
-/* 主要版本号：代际 */
-#define Lum_Version_Major 0
+/* ---------- 引擎当前版本 ---------- */
 
-/* patch 版本号：本代际内的迭代次数 */
-#define Lum_Version_Patch 1
+#define Lum_Version_Stage_Current Lum_Version_Stage_Prototype
+#define Lum_Version_Stage_Name    "prototype"
+#define Lum_Version_Iteration     1
 
-/* ---------- 比较与显示 ---------- */
+/* ---------- 编码与显示 ---------- */
 
-/* 两段数字打包成单个整数，便于编译期比较：
-     #if Lum_Version < Lum_Version_Encode(1, 0)
-       #error "需要 Luminous 1.0 或更高"
-     #endif
-   注意：这里刻意只用整数乘加、不做任何类型转换。#if 的预处理器不认
-   `(unsigned long)` 这类多词类型转型（GCC 会报 "missing binary operator
-   before token 'long'"）；不带转型的写法在 #if 和普通 C 表达式里都成立。
-   每段上限 255（8 位） */
-#define Lum_Version_Encode(major, patch) ((major) * 256 + (patch))
+/* 阶段在高位、迭代次数在低位（各 8 位）。只用整数乘加、不做类型转换：
+   #if 的预处理器不认 `(unsigned long)` 这类多词转型（GCC 报
+   "missing binary operator before token 'long'"）。 */
+#define Lum_Version_Encode(stage, iteration) ((stage) * 256 + (iteration))
 
 #define Lum_Version \
-  Lum_Version_Encode(Lum_Version_Major, Lum_Version_Patch)
+  Lum_Version_Encode(Lum_Version_Stage_Current, Lum_Version_Iteration)
 
-/* 字符串字面量版本号，形如 "prototype 0.1"。相邻字面量拼接，无运行时代价。
-   两级宏是必需的：只有经过一层展开，参数才会先被替换、再被字符串化。
-   Impl 那层只在本文件内使用；带下划线后缀会违反宏命名约定（每段首字母大写） */
+/* 字符串字面量版本号，形如 "prototype 1"。相邻字面量拼接，无运行时代价。
+   两级宏是必需的：只有经过一层展开，参数才会先被替换、再被字符串化。 */
 #define Lum_Version_Stringize_Impl(x) #x
 #define Lum_Version_Stringize(x)  Lum_Version_Stringize_Impl(x)
-#define Lum_Version_String                      \
-  Lum_Version_Stage " "                         \
-  Lum_Version_Stringize(Lum_Version_Major) "."  \
-  Lum_Version_Stringize(Lum_Version_Patch)
+#define Lum_Version_String \
+  Lum_Version_Stage_Name " " Lum_Version_Stringize(Lum_Version_Iteration)
+
+/* ---------- 兼容性声明：本引擎版本针对的 glimmer 版本 ----------
+*
+* 改这里 = 声明"引擎改到能配一个新 glimmer 版本了"。它与 glimmer 的实际版本必须一致，
+* 否则下面的 #if 会直接编译失败 —— 三道门里最早的一道（另两道在 CMake 配置期与
+* docs/versioning.md 的兼容性矩阵）。
+*
+* 为什么要求严格相等、而不是"大于等于"：prototype 阶段没有向前兼容承诺（见
+* docs/versioning.md），"针对哪个版本开发"就是全部事实。将来进入 alpha/beta 后，
+* 这里的判据会改成"引擎要求的最低 glimmer 版本"，届时 #if 的比较就有了顺序语义。
+*/
+#define Lum_Version_Glimmer_Stage     1          /* = Lum_Glimmer_Version_Stage_Prototype */
+#define Lum_Version_Glimmer_Stage_Name "prototype"
+#define Lum_Version_Glimmer_Iteration  2
+#define Lum_Version_Glimmer_String \
+  Lum_Version_Glimmer_Stage_Name " " Lum_Version_Stringize(Lum_Version_Glimmer_Iteration)
+
+#if Lum_Version_Glimmer_Stage != Lum_Glimmer_Version_Stage_Current
+#error "引擎声明的 glimmer 阶段与 include/glimmer/glimmer_version.h 不一致：两者必须成对修改（见 docs/versioning.md）"
+#endif
+
+#if Lum_Version_Glimmer_Iteration != Lum_Glimmer_Version_Iteration
+#error "引擎声明的 glimmer 迭代次数与 include/glimmer/glimmer_version.h 不一致：两者必须成对修改（见 docs/versioning.md）"
+#endif
 
 #endif //Lum_Version_H

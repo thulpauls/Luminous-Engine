@@ -1,7 +1,7 @@
 #ifndef Lum_Collision_H
 #define Lum_Collision_H
 
-#include "lum_math2d.h"
+#include "glimmer/lum_math2d.h"
 #include <stdint.h>
 #include <stdbool.h>
 

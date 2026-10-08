@@ -12,6 +12,7 @@
 */
 #include "luminous.h"
 #include "rts_camera.h"
+#include "rts_collision.h"
 #include "rts_layers.h"
 #include "rts_navgrid.h"
 #include "rts_orders.h"
@@ -146,6 +147,14 @@ static void sys_pre(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
   rts_orders_update(ecs, g_nav_enabled ? &g_nav : NULL, ctx->dt);
 }
 
+/* 单位互斥：把互相压住的单位推开。排在上面那个系统之后（priority 10 > 0），
+   因为"沿路点推进"会把单位挤到一起，这一步负责收拾。
+   它同样写 transform.position（local），所以也必须留在 Pre。 */
+static void sys_pre_collision(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
+  (void)ctx; (void)user_data;
+  rts_collision_resolve(ecs, g_nav_enabled ? &g_nav : NULL);
+}
+
 /* 结算命中放在 Post：Transform 阶段已跑完，transform.world 才是本步最新的。
    放在 Input 会用到上一帧矩阵 —— 镜头一动，框选位置就偏。 */
 static void sys_post(lum_Ecs* ecs, lum_Context* ctx, void* user_data) {
@@ -213,6 +222,7 @@ int main(void) {
   lum_app_add_system(Lum_Stage_Start,  0, sys_start,  NULL);
   lum_app_add_system(Lum_Stage_Input,  0, sys_input,  NULL);
   lum_app_add_system(Lum_Stage_Pre,    0, sys_pre,    NULL);
+  lum_app_add_system(Lum_Stage_Pre,   10, sys_pre_collision, NULL);
   lum_app_add_system(Lum_Stage_Post,   0, sys_post,   NULL);
   lum_app_add_system(Lum_Stage_Scene,  0, sys_scene,  NULL);
   lum_app_add_system(Lum_Stage_Screen, 0, sys_screen, NULL);

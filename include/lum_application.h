@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "lum_math2d.h"
-#include "lum_log.h"
-#include "lum_camera.h"
+#include "glimmer/lum_math2d.h"
+#include "glimmer/lum_log.h"
+#include "glimmer/lum_camera.h"
 #include "lum_ecs.h"
 
 struct lum_View;   /* 状态机只透传视图指针，不需要完整类型（避免与 scene 头循环包含） */

@@ -1,5 +1,5 @@
 #include "lum_collision.h"
-#include "lum_assert.h"
+#include "glimmer/lum_assert.h"
 #include <float.h>
 #include <math.h>
 #include <string.h>

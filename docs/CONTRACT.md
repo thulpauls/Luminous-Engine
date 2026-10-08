@@ -163,13 +163,21 @@
 |---|---|---|
 | `lum_assert.h` | `Lum_Assert` 真断言，`lum_assert_fail` 存在 | `Lum_Assert` = `((void)0)`，函数不存在 |
 | `lum_log.h` | `Lum_Log_Trace/Debug` 是真实调用 | 两者都变 no-op |
-| `lum_math2d.h` | `lum_vec2/3/4_print`、`lum_mat4_print` 有声明 | 声明消失 |
+| `lum_math2d.h` | `lum_vec2/3/4_print`、`lum_mat4_print` **始终有声明**（已修，见下） | 同左 |
 
 **【违反后果】** **同一个版本号可以有不同 API 面**。用 `Lum_Debug` 打开的库
 配未定义的头（或反之）→ 行为不一致、链接失败或断言静默消失。
 这直接让版本号失去可信度。
 
-**冻结前必须解决**（改成 PUBLIC 编译定义，或生成一个配置头）。
+**已修的部分**：`lum_math2d` 的四个打印函数不再随编译定义变化 —— 它们始终声明、
+始终编译，输出走 `lum_log_message(Lum_Log_Level_Debug, ...)`，是否真的上屏/落盘
+由日志模块的**运行时** `min_level` 决定（`lum_log_init` 默认 Debug，app 用
+`desc.log_level` 调）。顺带修掉两件事：原来裸 `printf` 绕开日志模块（没有前缀、
+不受级别控制、也进不了 `lum_log_set_file()` 的文件），以及自带 ANSI 反白转义
+（重定向到文件就是乱码，`lum_log_enable_color(false)` 也关不掉）。
+回归证据：同一份源码分别用「有 `-DLum_Debug`」与「没有」编译，输出逐行相同。
+
+**冻结前仍需解决**（剩下两处，改成 PUBLIC 编译定义，或生成一个配置头）。
 
 ---
 

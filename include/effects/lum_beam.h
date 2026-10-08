@@ -1,7 +1,7 @@
 #ifndef Lum_Beam_H
 #define Lum_Beam_H
 
-#include "lum_math2d.h"
+#include "glimmer/lum_math2d.h"
 #include <stdint.h>
 #include <stdbool.h>
 

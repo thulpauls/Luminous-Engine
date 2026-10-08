@@ -1,8 +1,8 @@
 #ifndef Lum_Assets_H
 #define Lum_Assets_H
 
-#include "lum_texture.h"
-#include "lum_text_renderer.h"
+#include "glimmer/lum_texture.h"
+#include "glimmer/lum_text_renderer.h"
 
 int  lum_assets_init(void);
 void lum_assets_shutdown(void);

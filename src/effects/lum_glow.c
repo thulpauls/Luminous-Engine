@@ -1,11 +1,11 @@
 #include "effects/lum_glow.h"
-#include "lum_renderer2d.h"
-#include "lum_shader.h"
-#include "lum_material.h"
-#include "lum_transform.h"
-#include "lum_log.h"
+#include "glimmer/lum_renderer2d.h"
+#include "glimmer/lum_shader.h"
+#include "glimmer/lum_material.h"
+#include "glimmer/lum_transform.h"
+#include "glimmer/lum_log.h"
 #include <string.h>
-#include "lum_assert.h"
+#include "glimmer/lum_assert.h"
 
 static const char* glow_vertex_shader =
   "#version 330 core\n"

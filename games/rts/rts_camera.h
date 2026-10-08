@@ -2,8 +2,8 @@
 #define Rts_Camera_H
 
 #include <stdbool.h>
-#include "lum_math2d.h"
-#include "lum_camera.h"
+#include "glimmer/lum_math2d.h"
+#include "glimmer/lum_camera.h"
 
 /*
 * RTS 相机控制器。直接操作引擎的 app 相机（lum_app_get_camera()），

@@ -1,8 +1,8 @@
 #ifndef Lum_Ui_H
 #define Lum_Ui_H
 
-#include "lum_math2d.h"
-#include "lum_text_renderer.h"
+#include "glimmer/lum_math2d.h"
+#include "glimmer/lum_text_renderer.h"
 
 /*
 * 保留模式界面：控件是持久对象，状态长在控件里，布局每帧自动计算，交互走事件回调。

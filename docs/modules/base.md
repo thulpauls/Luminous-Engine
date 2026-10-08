@@ -1,14 +1,12 @@
-# 基础层
+# 基础层（Luminous 高层）
 
-无副作用的地基：日志、断言、版本、数学、几何碰撞、容器。
+引擎高层的无副作用地基。**注意**：`log` / `assert` / `math2d` 已随第二次重组并入
+**glimmer 基础平台**（`glimmer/lum_*.h`），本层现在只剩版本、碰撞与容器。
 
 | 模块 | 头文件 | 职责 |
 |---|---|---|
-| `lum_version` | `lum_version.h` | 三段式版本号（**唯一来源**） |
-| `lum_log` | `lum_log.h` | 分级日志，全局单例 |
-| `lum_assert` | `lum_assert.h` | `Lum_Assert`：编程错误即 abort |
-| `lum_math2d` | `lum_math2d.h` | `Vec2` / `Vec3` / `Vec4` / `Mat4` / `Rect` |
-| `lum_collision` | `lum_collision.h` | 纯几何碰撞、射线、包含判定 |
+| `lum_version` | `lum_version.h` | **引擎**版本号（`<阶段> <迭代次数>`）**唯一来源** + 声明的兼容 glimmer 版本 |
+| `lum_collision` | `lum_collision.h` | 纯几何碰撞、射线、包含判定（依赖 glimmer 的 `math2d`） |
 | `lum_vector` | `containers/lum_vector.h` | 带 `elem_size` 的动态数组 |
 | `lum_list` | `containers/lum_list.h` | 侵入式双向链表（**纯头**） |
 
@@ -20,16 +18,23 @@
 
 ## `lum_version`
 
-**职责**：三段式版本号（`<开发阶段> <主要版本号>.<patch 版本号>`）的唯一来源。纯宏，无 `.c`。
+**职责**：**引擎**版本号的唯一来源（格式 `<开发阶段> <迭代次数>`，当前 `prototype 1`），
+并声明本引擎版本**针对哪个 glimmer 版本**开发。纯宏，无 `.c`。
 
-**契约**：编号规则、比较方式、CMake 如何取用，全部见 [versioning.md](../versioning.md)。
+glimmer 平台有自己独立的一条版本线，在 `glimmer/glimmer_version.h`（见 [glimmer.md](glimmer.md)）。
+
+**契约**：编号规则、兼容性矩阵、CMake 如何取用，全部见 [versioning.md](../versioning.md)。
 
 **易错点**
 
-- `Lum_Version_Encode(major, patch)` **只用整数乘加、不做类型转换** ——
+- `Lum_Version_Encode(stage, iteration)` **只用整数乘加、不做类型转换** ——
   这是刻意的：`#if` 的预处理器不认 `(unsigned long)` 这类多词类型转型
-- 每段上限 **255**（8 位）
-- **开发阶段词不参与比较**，它只出现在 `Lum_Version_String` 里
+- 每段上限 **255**（8 位）：阶段在高位、迭代次数在低位
+- **阶段名串（`Lum_Version_Stage_Name`）与阶段数值表必须同步改** ——
+  数值用于比较、名串用于显示，两者没有语言层面的绑定关系
+- `include/lum_version.h` 会包含 `glimmer/glimmer_version.h`，所以它**不再是叶子头**；
+  相应地，引擎声明的 glimmer 版本与实际不一致时，**任何包含它的编译单元都会编译失败**
+  （`#if` + `#error`），这是刻意的早期拦截
 
 ---
 

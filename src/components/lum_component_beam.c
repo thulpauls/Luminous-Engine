@@ -1,6 +1,6 @@
 #include "components/lum_component_beam.h"
 #include "effects/lum_beam.h"
-#include "lum_renderer2d.h"
+#include "glimmer/lum_renderer2d.h"
 #include "lum_serial.h"
 
 static lum_Component_type g_beam_type = Lum_Component_Invalid;

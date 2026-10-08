@@ -2,3 +2,6 @@ build/
 .vscode/
 *.exe
 .zcode/
+# 未被任何代码引用的商业字体（Monotype）—— 不进仓库
+resources/Helvetica-Neue-2.ttf
+resources/arial-regular.ttf

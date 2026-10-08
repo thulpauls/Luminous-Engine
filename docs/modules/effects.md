@@ -52,7 +52,7 @@
 
 **实现要点**：每个绘制调用会**按参数向材质变体池取一个材质**
 （`lum_material_variant_pool_acquire`），池是固定容量 + **轮转复用**的
-（见 [render.md](render.md) 的 `lum_material`）。
+（见 [glimmer.md](glimmer.md) 的 `lum_material`）。
 
 **易错点**
 

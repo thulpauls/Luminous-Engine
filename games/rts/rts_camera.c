@@ -1,8 +1,8 @@
 #include "rts_camera.h"
 
 #include "lum_application.h"
-#include "lum_input.h"
-#include "lum_window.h"
+#include "glimmer/lum_input.h"
+#include "glimmer/lum_window.h"
 #include <math.h>
 
 static float rts__clampf(float v, float lo, float hi) {

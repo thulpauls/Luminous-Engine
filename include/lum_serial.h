@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "lum_math2d.h"
+#include "glimmer/lum_math2d.h"
 #include "lum_ecs.h"
 #include "containers/lum_vector.h"
 

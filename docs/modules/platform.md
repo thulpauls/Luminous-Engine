@@ -1,14 +1,16 @@
-# 平台层
+# 平台层（glimmer 的一部分）
 
-与操作系统、窗口、输入、时钟打交道的一层。
+与操作系统、窗口、输入、时钟打交道的一层。**这些模块属于 glimmer 基础平台**
+（`glimmer/lum_*.h`），不在引擎高层 —— 它们加上数学层与渲染器，构成 glimmer
+"能脱离引擎独立运行"的底气（见 [`glimmer.md`](glimmer.md)）。
 
 | 模块 | 头文件 | 职责 |
 |---|---|---|
-| `lum_filesystem` | `lum_filesystem.h` | 整文件读写、存在性、大小与修改时间 |
-| `lum_window` | `lum_window.h` | GLFW 窗口 + OpenGL 上下文（单例） |
-| `lum_input_codes` | `lum_input_codes.h` | 键码 / 鼠标键枚举（**纯头**） |
-| `lum_input` | `lum_input.h` | 输入状态查询（单例） |
-| `lum_time` | `lum_time.h` | 帧计时、FPS、帧率上限（单例） |
+| `lum_filesystem` | `glimmer/lum_filesystem.h` | 整文件读写、存在性、大小与修改时间 |
+| `lum_window` | `glimmer/lum_window.h` | GLFW 窗口 + OpenGL 上下文（单例） |
+| `lum_input_codes` | `glimmer/lum_input_codes.h` | 键码 / 鼠标键枚举（**纯头**） |
+| `lum_input` | `glimmer/lum_input.h` | 输入状态查询（单例） |
+| `lum_time` | `glimmer/lum_time.h` | 帧计时、FPS、帧率上限（单例） |
 
 ---
 
